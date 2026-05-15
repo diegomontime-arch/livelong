@@ -1,29 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'language_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const LiveLongApp());
+  runApp(const HitLookApp());
 }
 
-class LiveLongApp extends StatelessWidget {
-  const LiveLongApp({super.key});
+class HitLookApp extends StatelessWidget {
+  const HitLookApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'LiveLong',
+      title: 'HitLook',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF080808),
+        scaffoldBackgroundColor: const Color(0xFF000000),
         fontFamily: 'Roboto',
         useMaterial3: true,
       ),
@@ -52,7 +57,6 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-
     _mainCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -65,7 +69,6 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1800),
     );
-
     _fadeIn = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _mainCtrl,
@@ -87,7 +90,6 @@ class _SplashScreenState extends State<SplashScreen>
         curve: const Interval(0, 0.5, curve: Curves.easeIn),
       ),
     );
-
     _mainCtrl.forward();
     _gridCtrl.forward();
 
@@ -116,10 +118,9 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF080808),
+      backgroundColor: const Color(0xFF000000),
       body: Stack(
         children: [
-          // Grid tech
           AnimatedBuilder(
             animation: _gridFade,
             builder: (_, __) => Opacity(
@@ -130,8 +131,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-
-          // Glow
           AnimatedBuilder(
             animation: _pulse,
             builder: (_, __) => Center(
@@ -151,8 +150,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-
-          // Conteúdo
           Center(
             child: FadeTransition(
               opacity: _fadeIn,
@@ -161,18 +158,16 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Ícone
                     AnimatedBuilder(
                       animation: _pulse,
                       builder: (_, __) => Container(
                         width: 82,
                         height: 82,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF0F0F0F),
+                          color: const Color(0xFF0D0D0D),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: const Color(0xFFD4AF37)
-                                .withOpacity(0.35),
+                            color: const Color(0xFFD4AF37).withOpacity(0.35),
                           ),
                           boxShadow: [
                             BoxShadow(
@@ -192,21 +187,32 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ),
                     ),
-
                     const SizedBox(height: 28),
-
-                    const Text(
-                      'LIVELONG',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 10,
+                    RichText(
+                      text: const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'HIT',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 6,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'LOOK',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFD4AF37),
+                              letterSpacing: 6,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-
                     const SizedBox(height: 8),
-
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -217,11 +223,10 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'AI · PROTECTION · SALES',
+                          'AI · SALES · INTELLIGENCE',
                           style: TextStyle(
                             fontSize: 9,
-                            color: const Color(0xFF888888)
-                                .withOpacity(0.6),
+                            color: const Color(0xFF888888).withOpacity(0.6),
                             letterSpacing: 3,
                             fontWeight: FontWeight.w300,
                           ),
@@ -234,17 +239,13 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 52),
-
                     _LoadingBar(),
                   ],
                 ),
               ),
             ),
           ),
-
-          // Versão
           Positioned(
             bottom: 28,
             right: 24,

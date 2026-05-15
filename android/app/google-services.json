@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "807145542991",
+    "project_id": "hitlook-app",
+    "storage_bucket": "hitlook-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:807145542991:android:845fd33c83baeecdc2a13a",
+        "android_client_info": {
+          "package_name": "com.livelong.livelong"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBfVW_NQDz2615HHfv9DvDbAGVLaZxyVCs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
