@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'questions_screen.dart';
+import 'agent_profile.dart';
 
 class AppColors {
   static const black = Color(0xFF000000);
@@ -140,7 +141,7 @@ class WatermarkBackground extends StatelessWidget {
         // Grid sutil
         Positioned.fill(
           child: Opacity(
-            opacity: 0.025,
+            opacity: 0.015,
             child: CustomPaint(painter: _GridPainter()),
           ),
         ),
@@ -605,7 +606,8 @@ class _LangButtonState extends State<_LangButton> {
 // ─── WELCOME ──────────────────────────────────────────────
 class WelcomeScreen extends StatefulWidget {
   final String lang;
-  const WelcomeScreen({super.key, required this.lang});
+  final String agentId;
+  const WelcomeScreen({super.key, required this.lang, this.agentId = 'default'});
 
   @override
   State<WelcomeScreen> createState() => _WelcomeScreenState();
@@ -616,6 +618,36 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late AnimationController _ctrl;
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
+  AgentProfile _agent = AgentProfile.defaultProfile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAgent();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _fadeIn = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeIn),
+    );
+    _slideUp = Tween<Offset>(
+      begin: const Offset(0, 0.08),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _ctrl.forward();
+  }
+
+  Future<void> _loadAgent() async {
+    final agent = await AgentProvider.loadAgent(widget.agentId);
+    if (mounted) setState(() => _agent = agent);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   final _texts = {
     'pt': {
@@ -627,7 +659,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       'b2': 'Suas informações são privadas',
       'b3': 'Resultado personalizado para você',
       'btn': 'DESCOBRIR MEU NÍVEL DE PROTEÇÃO',
-      'disc': 'Educacional. Não é consultoria financeira.',
+      'disc': 'Ferramenta educacional. Não constitui aconselhamento de seguros. Consulte um agente licenciado.',
     },
     'es': {
       'badge': 'PROTECCIÓN INTELIGENTE',
@@ -638,7 +670,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       'b2': 'Tu información es privada',
       'b3': 'Resultado personalizado para ti',
       'btn': 'DESCUBRIR MI NIVEL DE PROTECCIÓN',
-      'disc': 'Educativo. No es asesoría financiera.',
+      'disc': 'Herramienta educativa. No constituye asesoramiento de seguros. Consulte un agente licenciado.',
     },
     'en': {
       'badge': 'SMART PROTECTION',
@@ -649,36 +681,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       'b2': 'Your information is private',
       'b3': 'Personalized result for you',
       'btn': 'DISCOVER MY PROTECTION LEVEL',
-      'disc': 'Educational. Not financial advice.',
+      'disc': 'Educational tool only. Does not constitute insurance advice. Consult a licensed agent.',
     },
   };
 
   String _t(String key) =>
       _texts[widget.lang]?[key] ?? _texts['pt']![key]!;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-    _fadeIn = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeIn),
-    );
-    _slideUp = Tween<Offset>(
-      begin: const Offset(0, 0.08),
-      end: Offset.zero,
-    ).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _ctrl.forward();
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -699,7 +707,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                     const M4LifeLogo(fontSize: 22, showTagline: true),
 
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 16),
+
+                    // Card do agente
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 0),
+                      child: AgentCard(agent: _agent),
+                    ),
+
+                    const SizedBox(height: 24),
 
                     // Badge dourado
                     Container(

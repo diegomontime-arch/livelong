@@ -164,7 +164,7 @@ class _ResultScreenState extends State<ResultScreen>
       'talk_ana': {'pt': 'Falar com a Ana agora', 'es': 'Hablar con Ana ahora', 'en': 'Talk to Ana now'},
       'talk_agent': {'pt': 'Falar com um consultor', 'es': 'Hablar con un consultor', 'en': 'Talk to a consultant'},
       'redo': {'pt': 'Refazer o teste', 'es': 'Repetir el test', 'en': 'Redo the test'},
-      'edu_disc': {'pt': 'Resultado educacional. Não é consultoria financeira.', 'es': 'Resultado educativo. No es asesoría financiera.', 'en': 'Educational result. Not financial advice.'},
+      'edu_disc': {'pt': 'Ferramenta educacional. Não constitui aconselhamento de seguros. Consulte um agente licenciado.', 'es': 'Herramienta educativa. No constituye asesoramiento de seguros. Consulte un agente licenciado.', 'en': 'Educational tool only. Does not constitute insurance advice. Consult a licensed agent.'},
     };
     return (m[key] ?? {})[l] ?? (m[key] ?? {})['pt'] ?? key;
   }
