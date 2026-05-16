@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'questions_screen.dart';
 import 'agent_profile.dart';
+import 'agent_login_screen.dart';
 
 class AppColors {
   static const black = Color(0xFF000000);
@@ -418,9 +419,11 @@ class _LanguageScreenState extends State<LanguageScreen>
               position: _slideUp,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: SingleChildScrollView(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const SizedBox(height: 20),
                     const M4LifeLogo(fontSize: 42),
 
                     const SizedBox(height: 56),
@@ -491,8 +494,48 @@ class _LanguageScreenState extends State<LanguageScreen>
                         letterSpacing: 3,
                       ),
                     ),
+
+                    const SizedBox(height: 24),
+
+                    // Botão área do agente
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (_, __, ___) =>
+                                const AgentLoginScreen(),
+                            transitionsBuilder: (_, anim, __, child) =>
+                                FadeTransition(opacity: anim, child: child),
+                            transitionDuration:
+                                const Duration(milliseconds: 400),
+                          ),
+                        );
+                      },
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.person_outline,
+                            size: 12,
+                            color: AppColors.grey,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Área do Agente',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.grey,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
+              ),
               ),
             ),
           ),
