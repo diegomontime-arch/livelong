@@ -45,3 +45,4 @@ app.*.map.json
 /android/app/release
 # Nunca subir - contém API key
 lib/chat_screen.dart
+lib/chat_screen.dart
