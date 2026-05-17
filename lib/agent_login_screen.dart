@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:go_router/go_router.dart';
 import 'language_screen.dart';
 import 'agent_setup_screen.dart';
 
@@ -66,15 +67,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
       }
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          PageRouteBuilder(
-            pageBuilder: (_, __, ___) => const AgentSetupScreen(),
-            transitionsBuilder: (_, anim, __, child) =>
-                FadeTransition(opacity: anim, child: child),
-            transitionDuration: const Duration(milliseconds: 400),
-          ),
-        );
+        context.go('/dashboard');
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -399,17 +392,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                       height: 50,
                       child: OutlinedButton(
                         onPressed: () {
-                          Navigator.pushReplacement(
-                            context,
-                            PageRouteBuilder(
-                              pageBuilder: (_, __, ___) =>
-                                  const LanguageScreen(),
-                              transitionsBuilder: (_, anim, __, child) =>
-                                  FadeTransition(opacity: anim, child: child),
-                              transitionDuration:
-                                  const Duration(milliseconds: 400),
-                            ),
-                          );
+                          context.go('/');
                         },
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.greyLight,

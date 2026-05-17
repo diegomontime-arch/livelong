@@ -7,6 +7,7 @@ class QuestionScreen extends StatefulWidget {
   final String nome;
   final String telefone;
   final String nascimento;
+  final String agentId;
 
   const QuestionScreen({
     super.key,
@@ -14,6 +15,7 @@ class QuestionScreen extends StatefulWidget {
     required this.nome,
     required this.telefone,
     required this.nascimento,
+    this.agentId = 'default',
   });
 
   @override
@@ -257,6 +259,7 @@ class _QuestionScreenState extends State<QuestionScreen>
               nome: widget.nome,
               telefone: widget.telefone,
               nascimento: widget.nascimento,
+              agentId: widget.agentId,
             ),
             transitionsBuilder: (_, anim, __, child) =>
                 FadeTransition(opacity: anim, child: child),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'questions_screen.dart';
 import 'agent_profile.dart';
 import 'agent_login_screen.dart';
@@ -355,7 +356,8 @@ class M4LifeLogo extends StatelessWidget {
 
 // ─── LANGUAGE SCREEN ──────────────────────────────────────
 class LanguageScreen extends StatefulWidget {
-  const LanguageScreen({super.key});
+  final String agentId;
+  const LanguageScreen({super.key, this.agentId = 'default'});
 
   @override
   State<LanguageScreen> createState() => _LanguageScreenState();
@@ -398,7 +400,7 @@ class _LanguageScreenState extends State<LanguageScreen>
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => WelcomeScreen(lang: lang),
+          pageBuilder: (_, __, ___) => WelcomeScreen(lang: lang, agentId: widget.agentId),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 500),
@@ -499,19 +501,7 @@ class _LanguageScreenState extends State<LanguageScreen>
 
                     // Botão área do agente
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder: (_, __, ___) =>
-                                const AgentLoginScreen(),
-                            transitionsBuilder: (_, anim, __, child) =>
-                                FadeTransition(opacity: anim, child: child),
-                            transitionDuration:
-                                const Duration(milliseconds: 400),
-                          ),
-                        );
-                      },
+                      onTap: () => context.go('/login'),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -737,11 +727,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       backgroundColor: AppColors.black,
       body: WatermarkBackground(
         child: SafeArea(
+          bottom: true,
           child: FadeTransition(
             opacity: _fadeIn,
             child: SlideTransition(
               position: _slideUp,
-              child: Padding(
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,7 +807,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ),
 
-                    const Spacer(),
 
                     _BenefitRow(
                         icon: Icons.access_time_outlined,
@@ -840,7 +830,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             context,
                             PageRouteBuilder(
                               pageBuilder: (_, __, ___) =>
-                                  OnboardingScreen(lang: widget.lang),
+                                  OnboardingScreen(lang: widget.lang, agentId: widget.agentId),
                               transitionsBuilder:
                                   (_, anim, __, child) =>
                                       FadeTransition(
@@ -878,7 +868,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 100),
                   ],
                 ),
               ),
@@ -923,7 +913,8 @@ class _BenefitRow extends StatelessWidget {
 // ─── ONBOARDING ───────────────────────────────────────────
 class OnboardingScreen extends StatefulWidget {
   final String lang;
-  const OnboardingScreen({super.key, required this.lang});
+  final String agentId;
+  const OnboardingScreen({super.key, required this.lang, this.agentId = 'default'});
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();

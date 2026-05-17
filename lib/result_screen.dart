@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'language_screen.dart';
 import 'chat_screen.dart';
 
@@ -8,6 +9,7 @@ class ResultScreen extends StatefulWidget {
   final String nome;
   final String telefone;
   final String nascimento;
+  final String agentId;
 
   const ResultScreen({
     super.key,
@@ -16,6 +18,7 @@ class ResultScreen extends StatefulWidget {
     required this.nome,
     required this.telefone,
     required this.nascimento,
+    this.agentId = 'default',
   });
 
   @override
@@ -127,6 +130,24 @@ class _ResultScreenState extends State<ResultScreen>
     };
   }
 
+  Future<void> _saveLead() async {
+    try {
+      await FirebaseFirestore.instance.collection('leads').add({
+        'agentId': widget.agentId,
+        'nome': widget.nome,
+        'telefone': widget.telefone,
+        'nascimento': widget.nascimento,
+        'lang': widget.lang,
+        'answers': widget.answers,
+        'score': _score,
+        'status': 'novo',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // ignora erro silenciosamente
+    }
+  }
+
   double get _total => (_renda * 12 * _anos) + (_temDivida ? _divida : 0);
 
   String _fmt(double v) {
@@ -172,6 +193,7 @@ class _ResultScreenState extends State<ResultScreen>
   @override
   void initState() {
     super.initState();
+    _saveLead();
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
