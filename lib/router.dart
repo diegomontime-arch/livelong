@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'language_screen.dart';
@@ -10,10 +9,6 @@ final router = GoRouter(
   initialLocation: '/',
   redirect: (context, state) {
     final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-    final isAgentRoute = state.uri.path.startsWith('/agent') ||
-        state.uri.path == '/login' ||
-        state.uri.path == '/dashboard' ||
-        state.uri.path == '/perfil';
 
     if (state.uri.path == '/dashboard' && !isLoggedIn) {
       return '/login';

@@ -63,7 +63,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   void _copyLink() {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final link = 'https://hitlook-app.web.app/a/\$uid';
+    final link = 'https://hitlook-app.web.app/a/$uid';
     Clipboard.setData(ClipboardData(text: link));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
