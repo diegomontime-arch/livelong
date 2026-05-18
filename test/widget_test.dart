@@ -2,7 +2,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hitlook/main.dart';
+import 'package:hitlook/app.dart';
 
 void main() {
   testWidgets('HitLook app smoke test', (WidgetTester tester) async {

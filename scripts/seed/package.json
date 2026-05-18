@@ -1,0 +1,19 @@
+{
+  "name": "hitlook-seed",
+  "private": true,
+  "description": "Safe Firestore seed for local / dev (Firebase Admin SDK)",
+  "scripts": {
+    "seed": "node seed.js",
+    "seed:dry-run": "node seed.js --dry-run",
+    "seed:emulator": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node seed.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3"
+  }
+}

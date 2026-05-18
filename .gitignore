@@ -46,3 +46,9 @@ app.*.map.json
 # Nunca subir - contém API key
 lib/chat_screen.dart
 lib/chat_screen.dart
+
+# Seed scripts — secrets
+scripts/seed/.env
+scripts/seed/node_modules/
+scripts/seed/*serviceAccount*.json
+scripts/seed/*-firebase-adminsdk-*.json

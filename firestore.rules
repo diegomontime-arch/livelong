@@ -1,16 +1,341 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userExists() {
+      return isSignedIn() && exists(userPath());
+    }
+
+    function userData() {
+      return userExists() ? get(userPath()).data : null;
+    }
+
+    function userCompanyId() {
+      return userData().companyId;
+    }
+
+    function userSellerId() {
+      return userData().sellerId;
+    }
+
+    function userRole() {
+      return userData().role;
+    }
+
+    function isCompanyMember(companyId) {
+      return userExists() && userCompanyId() == companyId;
+    }
+
+    function isCompanyAdmin(companyId) {
+      return isCompanyMember(companyId) && userRole() == 'admin';
+    }
+
+    function isSellerInCompany(companyId, sellerId) {
+      return isCompanyMember(companyId) && userSellerId() == sellerId;
+    }
+
+    function sellerPath(companyId, sellerId) {
+      return /databases/$(database)/documents/companies/$(companyId)/sellers/$(sellerId);
+    }
+
+    function sellerExists(companyId, sellerId) {
+      return exists(sellerPath(companyId, sellerId));
+    }
+
+    function sellerData(companyId, sellerId) {
+      return get(sellerPath(companyId, sellerId)).data;
+    }
+
+    function leadPath(companyId, leadId) {
+      return /databases/$(database)/documents/companies/$(companyId)/leads/$(leadId);
+    }
+
+    function leadExists(companyId, leadId) {
+      return exists(leadPath(companyId, leadId));
+    }
+
+    function leadData(companyId, leadId) {
+      return get(leadPath(companyId, leadId)).data;
+    }
+
+    function isLeadSeller(companyId, leadId) {
+      return leadExists(companyId, leadId)
+        && isSellerInCompany(companyId, leadData(companyId, leadId).sellerId);
+    }
+
+    function isServerTimestamp(field) {
+      return !(field in request.resource.data)
+        || request.resource.data[field] == request.time;
+    }
+
+    // -------------------------------------------------------------------------
+    // Public lead form — create-only, whitelisted fields
+    // -------------------------------------------------------------------------
+
+    function publicLeadAllowedKeys() {
+      return [
+        'companyId',
+        'sellerId',
+        'status',
+        'locale',
+        'lang',
+        'answers',
+        'score',
+        'prospectName',
+        'prospectPhone',
+        'nome',
+        'telefone',
+        'nascimento',
+        'recommendedPlan',
+        'createdAt',
+        'updatedAt',
+        'agentId',
+      ];
+    }
+
+    function isValidPublicLeadCreate(companyId) {
+      let data = request.resource.data;
+      let sellerId = data.sellerId;
+
+      return sellerExists(companyId, sellerId)
+        && data.companyId == companyId
+        && data.sellerId == sellerId
+        && data.status in ['new', 'novo']
+        && data.keys().hasOnly(publicLeadAllowedKeys())
+        && !('userId' in data)
+        && !('role' in data)
+        && !('plan' in data)
+        && isServerTimestamp('createdAt')
+        && isServerTimestamp('updatedAt')
+        && optionalScoreValid(data);
+    }
+
+    function optionalScoreValid(data) {
+      return !('score' in data)
+        || (data.score is int && data.score >= 0 && data.score <= 100);
+    }
+
+    function sellerLeadUpdateValid() {
+      let data = request.resource.data;
+      let existing = resource.data;
+      return data.companyId == existing.companyId
+        && data.sellerId == existing.sellerId
+        && isServerTimestamp('updatedAt');
+    }
+
+    function userSelfLinkValid() {
+      let data = request.resource.data;
+      return data.companyId is string
+        && data.sellerId is string
+        && sellerExists(data.companyId, data.sellerId)
+        && sellerData(data.companyId, data.sellerId).userId == request.auth.uid;
+    }
+
+    function slugWriteValid() {
+      let data = request.resource.data;
+      return data.companyId is string
+        && data.sellerId is string
+        && data.slug is string
+        && sellerExists(data.companyId, data.sellerId)
+        && (
+          isCompanyAdmin(data.companyId)
+          || isSellerInCompany(data.companyId, data.sellerId)
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // users/{uid}
+    // -------------------------------------------------------------------------
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId
+        || (resource.data.companyId != null
+            && isCompanyAdmin(resource.data.companyId))
+      );
+
+      allow create: if request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'email',
+          'displayName',
+          'tenantId',
+          'companyId',
+          'sellerId',
+          'role',
+          'createdAt',
+          'updatedAt',
+        ])
+        && request.resource.data.get('role', 'seller') == 'seller'
+        && isServerTimestamp('createdAt')
+        && isServerTimestamp('updatedAt');
+
+      allow update: if request.auth.uid == userId
+        && request.resource.data.get('role', 'seller') == resource.data.get('role', 'seller')
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['companyId', 'sellerId'])
+          || userSelfLinkValid()
+        );
+
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // tenants/{tenantId} — public branding read; no client writes
+    // -------------------------------------------------------------------------
+
+    match /tenants/{tenantId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // companies/{companyId}
+    // -------------------------------------------------------------------------
+
+    match /companies/{companyId} {
+      allow read: if isCompanyMember(companyId);
+
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly([
+          'tenantId',
+          'name',
+          'plan',
+          'isActive',
+          'createdAt',
+          'updatedAt',
+        ])
+        && request.resource.data.tenantId is string
+        && request.resource.data.name is string
+        && request.resource.data.get('plan', 'starter') in ['starter', 'growth', 'enterprise']
+        && isServerTimestamp('createdAt')
+        && isServerTimestamp('updatedAt');
+
+      allow update, delete: if isCompanyAdmin(companyId);
+
+      // -----------------------------------------------------------------------
+      // companies/{companyId}/sellers/{sellerId}
+      // -----------------------------------------------------------------------
+
+      match /sellers/{sellerId} {
+        allow get: if true;
+        allow list: if isCompanyMember(companyId);
+
+        allow create: if isCompanyAdmin(companyId)
+          || (
+            isSignedIn()
+            && request.resource.data.userId == request.auth.uid
+            && request.resource.data.companyId == companyId
+          );
+
+        allow update: if isCompanyAdmin(companyId)
+          || (
+            isSellerInCompany(companyId, sellerId)
+            && resource.data.userId == request.auth.uid
+          );
+
+        allow delete: if isCompanyAdmin(companyId);
+      }
+
+      // -----------------------------------------------------------------------
+      // companies/{companyId}/leads/{leadId}
+      // -----------------------------------------------------------------------
+
+      match /leads/{leadId} {
+        allow read: if isCompanyAdmin(companyId)
+          || (
+            isSignedIn()
+            && isCompanyMember(companyId)
+            && resource.data.sellerId == userSellerId()
+          );
+
+        allow create: if isValidPublicLeadCreate(companyId)
+          || isCompanyAdmin(companyId)
+          || (
+            isSellerInCompany(companyId, request.resource.data.sellerId)
+            && request.resource.data.companyId == companyId
+          );
+
+        allow update: if isCompanyAdmin(companyId)
+          || (
+            isSellerInCompany(companyId, resource.data.sellerId)
+            && sellerLeadUpdateValid()
+          );
+
+        allow delete: if isCompanyAdmin(companyId);
+
+        // ---------------------------------------------------------------------
+        // companies/.../leads/.../ai_recommendations/{recommendationId}
+        // ---------------------------------------------------------------------
+
+        match /ai_recommendations/{recommendationId} {
+          allow read: if isCompanyAdmin(companyId) || isLeadSeller(companyId, leadId);
+
+          allow create: if isCompanyAdmin(companyId)
+            || isLeadSeller(companyId, leadId);
+
+          allow update, delete: if isCompanyAdmin(companyId);
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // seller_slugs/{slug}
+    // -------------------------------------------------------------------------
+
+    match /seller_slugs/{slug} {
+      allow get: if true;
+      allow list: if false;
+
+      allow create, update: if slugWriteValid();
+
+      allow delete: if isSignedIn()
+        && resource.data.companyId is string
+        && isCompanyAdmin(resource.data.companyId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Legacy (migration)
+    // -------------------------------------------------------------------------
+
     match /agents/{agentId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == agentId;
+      allow write: if isSignedIn() && request.auth.uid == agentId;
     }
+
     match /leads/{leadId} {
-      allow read: if request.auth != null &&
-        request.auth.uid == resource.data.agentId;
-      allow create: if true;
-      allow update: if request.auth != null &&
-        request.auth.uid == resource.data.agentId;
+      allow read: if isSignedIn()
+        && resource.data.agentId == request.auth.uid;
+
+      allow create: if request.resource.data.keys().hasOnly([
+          'agentId',
+          'nome',
+          'telefone',
+          'nascimento',
+          'lang',
+          'answers',
+          'score',
+          'status',
+          'createdAt',
+        ])
+        && request.resource.data.status == 'novo'
+        && isServerTimestamp('createdAt');
+
+      allow update, delete: if isSignedIn()
+        && resource.data.agentId == request.auth.uid;
     }
   }
 }
