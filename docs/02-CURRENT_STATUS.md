@@ -1,71 +1,61 @@
-# 02 — Status Atual
+# 02 — Estado Atual (atualizado 19/05/2026)
 
-_Última atualização: 15/05/2026_
+## O que está funcionando
 
-## Pronto e no ar
+### Fluxo do cliente (COMPLETO E NO AR)
+- Seleção de idioma — PT / ES / EN com bandeirinhas
+- Layout responsivo — desktop duas colunas, mobile uma coluna
+- Card do agente no topo — foto, nome, bio, WhatsApp
+- Onboarding — nome, telefone, data de nascimento
+- 5 perguntas de qualificação em 3 idiomas
+- Score animado de proteção familiar
+- Plano educacional recomendado
+- Calculadora familiar interativa
+- Chat com Ana (IA educacional) — CORS pendente
+- Botão falar com consultor via WhatsApp
+- Lead salvo no Firestore
 
-- Splash HitLook (lib/main.dart)
-- Seleção de idioma PT/ES/EN (lib/language_screen.dart)
-- Onboarding (nome, telefone, nascimento)
-- 5 perguntas (lib/questions_screen.dart)
-- Score animado + plano recomendado (lib/result_screen.dart)
-- Calculadora familiar
-- Chat com Ana (lib/chat_screen.dart)
-- Firebase: Firestore, Auth, Storage, Hosting ativos
-- Storage rules criadas
-- GitHub: diegomontime-arch/livelong
-- Deploy: hitlook-app.web.app
+### Fluxo do agente (PARCIALMENTE FUNCIONANDO)
+- Login com email e senha — Firebase Auth
+- Painel com link personalizado — copiar funcionando
+- Upload de foto — funcionando
+- Cadastro de nome, bio, WhatsApp — funcionando
+- Lista de leads recebidos — funcionando
 
-## Em construção
+### Fluxo do empresário/admin (CONSTRUÍDO, NÃO TESTADO)
+- AdminDashboardScreen — criado pelo Cowork
+- Criação de agentes com slug personalizado
+- Visualização de leads por agente
+- REQUER: documento users/{uid} com role:admin e companyId no Firestore
 
-- agent_setup_screen.dart — escrito, **não testado**
-- AgentProfile + AgentProvider (agent_profile.dart)
+### Infraestrutura
+- Firebase Hosting — hitlook-app.web.app
+- Firebase Auth — email/senha ativo
+- Firestore — regras configuradas
+- Firebase Storage — fotos dos agentes
+- GitHub — diegomontime-arch/livelong
+- go_router — roteamento configurado
 
-## Pendente
+## O que NÃO está funcionando
 
-**Bloco 1 — desbloquear (esta semana)**
-- [ ] `flutter run -d chrome` e validar
-- [ ] Corrigir erros de compilação
-- [ ] Conectar agent_setup ao fluxo
-- [ ] Build + deploy
+### Crítico
+- Ana (IA) — CORS bloqueia chamadas diretas para Anthropic no browser
+- Renan não tem acesso ao painel admin — falta documento no Firestore
+- Foto do agente no link do cliente — não confirmado ainda
 
-**Bloco 2 — auth (próximos 3 dias)**
-- [ ] Login Firebase Auth
-- [ ] Sessão persistente
-- [ ] Roteamento agente vs prospect
-- [ ] Logout
+### Importante
+- Stripe — não implementado
+- WhatsApp com mensagem pré-preenchida — botão existe mas sem número real
+- Open Graph por agente — genérico M4LIFE para todos
 
-**Bloco 3 — painel (próximos 7 dias)**
-- [ ] Lista de leads
-- [ ] Status (novo/contatado/fechado/perdido)
-- [ ] Detalhe do lead
-- [ ] Botão WhatsApp
+### Dívida técnica
+- Dois schemas de leads paralelos — leads raiz (legado) e companies/.../leads (SaaS)
+- agentId pode ser UID ou slug — inconsistência no dashboard
+- chat_screen.dart — API key local, fora do git
+- Logs de debug ainda ativos — public_lead_agent_id_log.dart
 
-**Bloco 4 — distribuição (próximos 7 dias)**
-- [ ] Rota /a/[id]
-- [ ] Open Graph dinâmico
-- [ ] Compartilhamento nativo
-
-**Bloco 5 — receita (próximos 14 dias)**
-- [ ] Stripe Checkout
-- [ ] Webhook
-- [ ] Tela de billing
-- [ ] Bloqueio se inativo
-
-**Bloco 6 — operação (paralelo)**
-- [ ] API key Anthropic em variável de ambiente (NÃO no código)
-- [ ] Rate limit no chat Ana
-- [ ] Firebase Analytics ativo
-- [ ] Termos de uso + privacidade
-- [ ] Disclaimer "não é aconselhamento"
-
-## Métricas a medir AGORA
-
-Funil completo:
-- Links enviados (por agente, por dia)
-- Links abertos
-- Perguntas completadas
-- Cliques no botão WhatsApp
-- Reportados como fechados pelo agente
-
-Sem isso, otimização é chute.
+## Dois schemas paralelos — DECISÃO PENDENTE
+O Cowork criou estrutura SaaS nova em paralelo ao legado.
+Legado: agents/{uid}, leads raiz com agentId
+SaaS novo: companies/{id}/sellers/{id}, seller_slugs, users/{uid}
+DECISÃO NECESSÁRIA: unificar em um schema só antes de lançar

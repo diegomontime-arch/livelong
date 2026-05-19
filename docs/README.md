@@ -1,23 +1,26 @@
-# HitLook / M4LIFE — Documentação Interna
+# HitLook — Documentação Master
 
-| Arquivo | Para quê serve |
-|---|---|
-| `01-VISION.md` | O que é o HitLook |
-| `02-CURRENT_STATUS.md` | Onde estamos hoje |
-| `03-HONEST_ASSESSMENT.md` | Análise crítica — leitura obrigatória |
-| `04-ROADMAP.md` | Plano 30 / 60 / 90 dias |
-| `05-CHECKLIST.md` | Próximas ações priorizadas |
-| `06-BUSINESS_MODEL.md` | Pricing, unit economics |
-| `07-RISKS.md` | O que pode matar o negócio |
-
-## Rotina
-
-- Toda segunda: abrir `05-CHECKLIST.md`, definir 3 tarefas da semana
-- Toda sexta: atualizar `02-CURRENT_STATUS.md`
-- Antes de decisão grande: reler `03-HONEST_ASSESSMENT.md` e `07-RISKS.md`
-
-## Repositório
-
-- GitHub: github.com/diegomontime-arch/livelong
+## Links importantes
 - App: https://hitlook-app.web.app
-- Firebase: hitlook-app
+- GitHub: https://github.com/diegomontime-arch/livelong
+- Firebase: https://console.firebase.google.com/project/hitlook-app
+- Pasta local: ~/livelong
+
+## Regra de ouro
+Toda modificação → flutter build web --release → firebase deploy --only hosting → git add . && git commit -m "descrição" && git push
+
+## Script rápido
+cd ~/livelong && ./save.sh "descrição do que mudou"
+
+---
+
+| Documento | Conteúdo |
+|---|---|
+| 01-VISION.md | O que é o HitLook |
+| 02-CURRENT_STATUS.md | Estado atual real |
+| 03-ARCHITECTURE.md | Arquitetura técnica completa |
+| 04-ROADMAP.md | Plano de execução |
+| 05-CHECKLIST.md | Próximas ações |
+| 06-BUSINESS_MODEL.md | Modelo de negócio |
+| 07-RISKS.md | Riscos e como mitigar |
+| 08-BRIEFING.md | Briefing para Claude/Cowork/GPT |
