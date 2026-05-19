@@ -2,7 +2,6 @@ import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hitlook/legacy/debug/public_lead_agent_id_log.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/chat_screen.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
@@ -136,7 +135,6 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   Future<void> _saveLead() async {
-    logPublicLeadAgentId('ResultScreen._saveLead', widget.agentId);
     try {
       await FirebaseFirestore.instance.collection('leads').add({
         'agentId': widget.agentId,
@@ -199,7 +197,6 @@ class _ResultScreenState extends State<ResultScreen>
   @override
   void initState() {
     super.initState();
-    logPublicLeadAgentId('ResultScreen', widget.agentId);
     _saveLead();
     _ctrl = AnimationController(
       vsync: this,
@@ -251,7 +248,6 @@ class _ResultScreenState extends State<ResultScreen>
 
   Future<void> _abrirWhatsApp() async {
     final agentId = widget.agentId;
-    logPublicLeadAgentId('ResultScreen._abrirWhatsApp', agentId);
     if (agentId.isEmpty || agentId == 'default') {
       _mostrarErroWhatsApp();
       return;

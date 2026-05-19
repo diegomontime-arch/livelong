@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hitlook/legacy/debug/public_lead_agent_id_log.dart';
 import 'package:hitlook/legacy/screens/agent_login_screen.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/questions_screen.dart';
@@ -375,7 +374,6 @@ class _LanguageScreenState extends State<LanguageScreen>
   @override
   void initState() {
     super.initState();
-    logPublicLeadAgentId('LanguageScreen', widget.agentId);
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -661,7 +659,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
-    logPublicLeadAgentId('WelcomeScreen', widget.agentId);
     _loadAgent();
     _ctrl = AnimationController(
       vsync: this,
@@ -981,7 +978,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void initState() {
     super.initState();
-    logPublicLeadAgentId('OnboardingScreen', widget.agentId);
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 600));
     _fadeIn = Tween<double>(begin: 0, end: 1).animate(
@@ -1000,7 +996,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _continuar() {
     if (_formKey.currentState!.validate()) {
-      logPublicLeadAgentId('OnboardingScreen→QuestionScreen', widget.agentId);
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(

@@ -43,9 +43,8 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-# Nunca subir - contém API key
-lib/chat_screen.dart
-lib/chat_screen.dart
+# Nunca subir — contém API key / proxy local
+lib/legacy/screens/chat_screen.dart
 
 # Seed scripts — secrets
 scripts/seed/.env

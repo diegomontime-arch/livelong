@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hitlook/legacy/debug/public_lead_agent_id_log.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/screens/result_screen.dart';
 import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
@@ -252,7 +251,6 @@ class _QuestionScreenState extends State<QuestionScreen>
         _ctrl.reset();
         _ctrl.forward();
       } else {
-        logPublicLeadAgentId('QuestionScreen→ResultScreen', widget.agentId);
         Navigator.pushReplacement(
           context,
           PageRouteBuilder(
@@ -276,7 +274,6 @@ class _QuestionScreenState extends State<QuestionScreen>
   @override
   void initState() {
     super.initState();
-    logPublicLeadAgentId('QuestionScreen', widget.agentId);
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 450),
