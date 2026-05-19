@@ -3,19 +3,37 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:hitlook/core/constants/route_paths.dart';
+import 'package:hitlook/legacy/admin/admin_session.dart';
 
-/// Auth and scope redirects for [GoRouter].
-String? authRedirect(BuildContext context, GoRouterState state) {
+/// Auth and role-based redirects for [GoRouter].
+Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
   final isLoggedIn = FirebaseAuth.instance.currentUser != null;
   final path = state.uri.path;
 
-  final protectedPaths = {
+  final sellerPaths = {
     RoutePaths.dashboard,
     RoutePaths.sellerProfile,
   };
 
-  if (protectedPaths.contains(path) && !isLoggedIn) {
+  final isAdminPath = path == RoutePaths.admin || path.startsWith('${RoutePaths.admin}/');
+
+  if ((sellerPaths.contains(path) || isAdminPath) && !isLoggedIn) {
     return RoutePaths.login;
+  }
+
+  if (!isLoggedIn) return null;
+
+  final session = await AdminSession.load();
+
+  if (isAdminPath) {
+    if (session == null || !session.isAdmin) {
+      return RoutePaths.dashboard;
+    }
+    return null;
+  }
+
+  if (path == RoutePaths.dashboard && session?.isAdmin == true) {
+    return RoutePaths.admin;
   }
 
   return null;

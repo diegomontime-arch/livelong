@@ -105,14 +105,16 @@ class FirebaseLeadRepository implements LeadRepository {
   }
 
   static String _statusToFirestore(LeadStatus status) {
-    if (status == LeadStatus.newLead) return 'new';
-    return status.name;
+    return switch (status) {
+      LeadStatus.newLead => 'new',
+      LeadStatus.contacted => 'contacted',
+      LeadStatus.followUp => 'follow_up',
+      LeadStatus.closed => 'closed',
+      LeadStatus.lost => 'lost',
+    };
   }
 
   static String _statusFromFirestore(String? value) {
-    if (value == null || value == 'novo' || value == 'new') {
-      return LeadStatus.newLead.name;
-    }
-    return value;
+    return LeadStatus.fromString(value).name;
   }
 }

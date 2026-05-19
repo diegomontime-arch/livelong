@@ -1,12 +1,12 @@
 import 'dart:typed_data';
-import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:go_router/go_router.dart';
-import 'package:hitlook/legacy/screens/agent_profile.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:hitlook/core/constants/firestore_paths.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 class AgentSetupScreen extends StatefulWidget {
@@ -23,6 +23,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   final _formKey = GlobalKey<FormState>();
   Uint8List? _fotoBytes;
   String? _fotoUrl;
+  String? _fotoContentType;
+  final ImagePicker _imagePicker = ImagePicker();
   bool _loading = false;
   bool _salvando = false;
 
@@ -61,28 +63,61 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   }
 
   Future<void> _selecionarFoto() async {
-    final input = html.FileUploadInputElement()..accept = 'image/*';
-    input.click();
-    await input.onChange.first;
-    if (input.files == null || input.files!.isEmpty) return;
-    final file = input.files!.first;
-    final reader = html.FileReader();
-    reader.readAsArrayBuffer(file);
-    await reader.onLoad.first;
-    final bytes = reader.result as Uint8List;
-    setState(() => _fotoBytes = bytes);
+    try {
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+
+      final bytes = await picked.readAsBytes();
+      if (bytes.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Não foi possível ler a imagem. Tente outro arquivo.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _fotoBytes = bytes;
+        _fotoContentType = picked.mimeType ?? _mimeFromName(picked.name);
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao selecionar foto: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  String _mimeFromName(String name) {
+    final lower = name.toLowerCase();
+    if (lower.endsWith('.png')) return 'image/png';
+    if (lower.endsWith('.webp')) return 'image/webp';
+    if (lower.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
   }
 
   Future<String?> _uploadFoto(String uid) async {
     if (_fotoBytes == null) return _fotoUrl;
-    final ref = FirebaseStorage.instance
-        .ref()
-        .child('agents/$uid/photo');
+    final ref = FirebaseStorage.instance.ref().child('agents/$uid/photo');
     final task = await ref.putData(
       _fotoBytes!,
-      SettableMetadata(contentType: 'image/jpeg'),
+      SettableMetadata(contentType: _fotoContentType ?? 'image/jpeg'),
     );
-    return await task.ref.getDownloadURL();
+    return task.ref.getDownloadURL();
   }
 
   Future<void> _salvar() async {
@@ -113,24 +148,44 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     setState(() => _salvando = true);
     try {
       final fotoUrl = await _uploadFoto(uid);
-      await FirebaseFirestore.instance
-          .collection('agents')
-          .doc(uid)
-          .set({
-        'nome': _nomeCtrl.text.trim(),
-        'bio': _bioCtrl.text.trim(),
-        'whatsapp': _whatsappCtrl.text.trim(),
-        'fotoUrl': fotoUrl ?? '',
+      final nome = _nomeCtrl.text.trim();
+      final bio = _bioCtrl.text.trim();
+      final whatsapp = _whatsappCtrl.text.trim();
+      final foto = fotoUrl ?? '';
+
+      await FirebaseFirestore.instance.collection('agents').doc(uid).set({
+        'nome': nome,
+        'bio': bio,
+        'whatsapp': whatsapp,
+        'fotoUrl': foto,
+        'userId': uid,
         'idioma': 'pt',
         'nicho': 'seguro',
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+
+      try {
+        await _syncSellerAndPublicSlug(
+          uid: uid,
+          nome: nome,
+          bio: bio,
+          whatsapp: whatsapp,
+          fotoUrl: foto,
+        );
+      } catch (_) {
+        // Perfil principal já foi salvo; sync SaaS/slug é best-effort.
+      }
+
       if (mounted) {
-        setState(() => _fotoUrl = fotoUrl);
+        setState(() {
+          if (foto.isNotEmpty) _fotoUrl = foto;
+          _fotoBytes = null;
+          _fotoContentType = null;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              fotoUrl != null && fotoUrl.isNotEmpty
+              foto.isNotEmpty
                   ? 'Perfil salvo com foto!'
                   : 'Perfil salvo (sem foto).',
             ),
@@ -150,6 +205,50 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       }
     }
     setState(() => _salvando = false);
+  }
+
+  /// Keeps SaaS seller + public slug doc in sync with legacy `agents/{uid}`.
+  Future<void> _syncSellerAndPublicSlug({
+    required String uid,
+    required String nome,
+    required String bio,
+    required String whatsapp,
+    required String fotoUrl,
+  }) async {
+    final userSnap =
+        await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    if (!userSnap.exists || userSnap.data() == null) return;
+
+    final companyId = userSnap.data()!['companyId'] as String?;
+    final sellerId = userSnap.data()!['sellerId'] as String?;
+    if (companyId == null || sellerId == null) return;
+
+    final sellerRef = FirebaseFirestore.instance
+        .doc(FirestorePaths.companySeller(companyId, sellerId));
+
+    await sellerRef.set({
+      'displayName': nome,
+      'bio': bio,
+      'phone': whatsapp,
+      if (fotoUrl.isNotEmpty) 'photoUrl': fotoUrl,
+      'userId': uid,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    final slug = (await sellerRef.get()).data()?['slug'] as String?;
+    if (slug == null || slug.isEmpty) return;
+
+    await FirebaseFirestore.instance.collection('agents').doc(slug).set({
+      'nome': nome,
+      'bio': bio,
+      'whatsapp': whatsapp,
+      'fotoUrl': fotoUrl,
+      'userId': uid,
+      'slug': slug,
+      'idioma': 'pt',
+      'nicho': 'seguro',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   @override
@@ -219,12 +318,28 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                                   ),
                                   child: ClipOval(
                                     child: _fotoBytes != null
-                                        ? Image.memory(_fotoBytes!,
-                                            fit: BoxFit.cover)
+                                        ? Image.memory(
+                                            _fotoBytes!,
+                                            fit: BoxFit.cover,
+                                            width: 100,
+                                            height: 100,
+                                          )
                                         : _fotoUrl != null &&
                                                 _fotoUrl!.isNotEmpty
-                                            ? Image.network(_fotoUrl!,
-                                                fit: BoxFit.cover)
+                                            ? Image.network(
+                                                _fotoUrl!,
+                                                fit: BoxFit.cover,
+                                                width: 100,
+                                                height: 100,
+                                                errorBuilder: (_, __, ___) =>
+                                                    const Center(
+                                                  child: Icon(
+                                                    Icons.broken_image_outlined,
+                                                    size: 40,
+                                                    color: AppColors.gold,
+                                                  ),
+                                                ),
+                                              )
                                             : const Center(
                                                 child: Icon(
                                                   Icons.person_outline,
@@ -262,12 +377,16 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
 
                         const SizedBox(height: 8),
 
-                        const Center(
+                        Center(
                           child: Text(
-                            'Toque para adicionar sua foto',
+                            _fotoBytes != null
+                                ? 'Foto selecionada — clique em SALVAR PERFIL'
+                                : 'Toque para escolher sua foto',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.greyLight,
+                              color: _fotoBytes != null
+                                  ? AppColors.gold
+                                  : AppColors.greyLight,
                             ),
                           ),
                         ),

@@ -48,20 +48,97 @@ class AgentProfile {
 
 // ─── PROVIDER DO AGENTE ──────────────────────────────────
 class AgentProvider {
+  /// Loads the public seller profile for [agentId] (Firebase UID or public slug).
+  ///
+  /// Profile data may live in legacy `agents/{uid}` and/or SaaS
+  /// `seller_slugs` + `companies/.../sellers`. When the link uses a slug,
+  /// we merge the SaaS seller with `agents/{userId}` so the photo saved in
+  /// "Meu perfil" still appears.
   static Future<AgentProfile> loadAgent(String agentId) async {
-    try {
-      final doc = await FirebaseFirestore.instance
-          .collection('agents')
-          .doc(agentId)
-          .get();
-
-      if (doc.exists && doc.data() != null) {
-        return AgentProfile.fromMap(agentId, doc.data()!);
-      }
+    if (agentId.isEmpty || agentId == 'default') {
       return AgentProfile.defaultProfile;
+    }
+
+    try {
+      final direct = await _loadAgentsDoc(agentId);
+      if (direct != null && _isConfigured(direct)) return direct;
+
+      final viaSlug = await _loadViaSellerSlug(agentId);
+      if (viaSlug != null) return viaSlug;
+
+      return direct ?? AgentProfile.defaultProfile;
     } catch (e) {
       return AgentProfile.defaultProfile;
     }
+  }
+
+  static bool _isConfigured(AgentProfile profile) {
+    return profile.nome.isNotEmpty &&
+        profile.nome != AgentProfile.defaultProfile.nome;
+  }
+
+  static Future<AgentProfile?> _loadAgentsDoc(String id) async {
+    final doc = await FirebaseFirestore.instance
+        .collection('agents')
+        .doc(id)
+        .get();
+    if (!doc.exists || doc.data() == null) return null;
+    return AgentProfile.fromMap(id, doc.data()!);
+  }
+
+  static Future<AgentProfile?> _loadViaSellerSlug(String slug) async {
+    final slugDoc = await FirebaseFirestore.instance
+        .collection('seller_slugs')
+        .doc(slug)
+        .get();
+    if (!slugDoc.exists || slugDoc.data() == null) return null;
+
+    final slugData = slugDoc.data()!;
+    final companyId = slugData['companyId'] as String?;
+    final sellerId = slugData['sellerId'] as String?;
+    if (companyId == null || sellerId == null) return null;
+
+    final sellerDoc = await FirebaseFirestore.instance
+        .collection('companies')
+        .doc(companyId)
+        .collection('sellers')
+        .doc(sellerId)
+        .get();
+    if (!sellerDoc.exists || sellerDoc.data() == null) return null;
+
+    final seller = sellerDoc.data()!;
+    var profile = AgentProfile(
+      id: slug,
+      nome: seller['displayName'] as String? ?? '',
+      bio: seller['bio'] as String? ?? '',
+      whatsapp: seller['phone'] as String? ??
+          seller['whatsapp'] as String? ??
+          '',
+      fotoUrl: seller['photoUrl'] as String? ?? '',
+      idioma: 'pt',
+      nicho: 'seguro',
+    );
+
+    final linkedUid = seller['userId'] as String?;
+    if (linkedUid != null && linkedUid.isNotEmpty) {
+      final legacy = await _loadAgentsDoc(linkedUid);
+      if (legacy != null) profile = _merge(profile, legacy);
+    }
+
+    return profile;
+  }
+
+  /// Prefer SaaS display fields; fill photo/name from legacy when missing.
+  static AgentProfile _merge(AgentProfile primary, AgentProfile legacy) {
+    return AgentProfile(
+      id: primary.id,
+      nome: primary.nome.isNotEmpty ? primary.nome : legacy.nome,
+      bio: primary.bio.isNotEmpty ? primary.bio : legacy.bio,
+      whatsapp: primary.whatsapp.isNotEmpty ? primary.whatsapp : legacy.whatsapp,
+      fotoUrl: primary.fotoUrl.isNotEmpty ? primary.fotoUrl : legacy.fotoUrl,
+      idioma: primary.idioma,
+      nicho: primary.nicho,
+    );
   }
 }
 

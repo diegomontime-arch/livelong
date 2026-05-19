@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hitlook/legacy/screens/agent_setup_screen.dart';
+import 'package:hitlook/legacy/admin/admin_session.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 class AgentLoginScreen extends StatefulWidget {
@@ -21,9 +21,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
   final _formKey = GlobalKey<FormState>();
 
   bool _loading = false;
+  bool _resetLoading = false;
   bool _senhaVisivel = false;
   bool _isCadastro = false;
   String? _erro;
+  String? _sucesso;
 
   @override
   void initState() {
@@ -46,11 +48,57 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     super.dispose();
   }
 
+  Future<void> _recuperarSenha() async {
+    final email = _emailCtrl.text.trim();
+
+    if (email.isEmpty) {
+      setState(() {
+        _erro = 'Digite seu email para recuperar a senha.';
+        _sucesso = null;
+      });
+      return;
+    }
+
+    if (!email.contains('@')) {
+      setState(() {
+        _erro = 'Email inválido.';
+        _sucesso = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _resetLoading = true;
+      _erro = null;
+      _sucesso = null;
+    });
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        setState(() {
+          _sucesso = 'Enviamos um link de recuperação para seu e-mail.';
+        });
+      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _erro = _traduzirErroReset(e.code);
+      });
+    } catch (_) {
+      setState(() {
+        _erro = 'Não foi possível enviar o e-mail. Tente novamente.';
+      });
+    }
+
+    if (mounted) setState(() => _resetLoading = false);
+  }
+
   Future<void> _entrar() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
       _erro = null;
+      _sucesso = null;
     });
 
     try {
@@ -67,7 +115,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
       }
 
       if (mounted) {
-        context.go('/dashboard');
+        final route = await AdminSession.postLoginRoute();
+        context.go(route);
       }
     } on FirebaseAuthException catch (e) {
       setState(() {
@@ -98,6 +147,21 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
         return 'Email ou senha incorretos.';
       default:
         return 'Erro ao entrar. Tente novamente.';
+    }
+  }
+
+  String _traduzirErroReset(String code) {
+    switch (code) {
+      case 'invalid-email':
+        return 'Email inválido.';
+      case 'user-not-found':
+        return 'Não encontramos uma conta com este e-mail.';
+      case 'too-many-requests':
+        return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.';
+      case 'network-request-failed':
+        return 'Sem conexão. Verifique sua internet e tente novamente.';
+      default:
+        return 'Não foi possível enviar o e-mail. Tente novamente.';
     }
   }
 
@@ -259,8 +323,70 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                             ),
                           ),
                         ),
+                        if (!_isCadastro) ...[
+                          const SizedBox(height: 8),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: GestureDetector(
+                              onTap: _resetLoading || _loading
+                                  ? null
+                                  : _recuperarSenha,
+                              child: _resetLoading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.gold,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Esqueceu a senha?',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.gold,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
+
+                    // Sucesso (recuperação de senha)
+                    if (_sucesso != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2ECC71).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: const Color(0xFF2ECC71).withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_outline,
+                              size: 16,
+                              color: Color(0xFF2ECC71),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _sucesso!,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF2ECC71),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
 
                     // Erro
                     if (_erro != null) ...[
@@ -303,7 +429,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _loading ? null : _entrar,
+                        onPressed: _loading || _resetLoading ? null : _entrar,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.gold,
                           foregroundColor: AppColors.black,
@@ -340,6 +466,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                         onTap: () => setState(() {
                           _isCadastro = !_isCadastro;
                           _erro = null;
+                          _sucesso = null;
                         }),
                         child: Text(
                           _isCadastro

@@ -1,7 +1,12 @@
+import 'dart:html' as html;
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hitlook/legacy/debug/public_lead_agent_id_log.dart';
+import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/chat_screen.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
+import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
 
 class ResultScreen extends StatefulWidget {
   final String lang;
@@ -131,6 +136,7 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   Future<void> _saveLead() async {
+    logPublicLeadAgentId('ResultScreen._saveLead', widget.agentId);
     try {
       await FirebaseFirestore.instance.collection('leads').add({
         'agentId': widget.agentId,
@@ -193,6 +199,7 @@ class _ResultScreenState extends State<ResultScreen>
   @override
   void initState() {
     super.initState();
+    logPublicLeadAgentId('ResultScreen', widget.agentId);
     _saveLead();
     _ctrl = AnimationController(
       vsync: this,
@@ -228,6 +235,7 @@ class _ResultScreenState extends State<ResultScreen>
           answers: widget.answers,
           score: _score,
           nome: widget.nome,
+          agentId: widget.agentId,
         ),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
           position: Tween<Offset>(
@@ -241,18 +249,91 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  void _abrirWhatsApp() {
-    // Aqui vai o link do WhatsApp do agente
-    // Por enquanto placeholder
+  Future<void> _abrirWhatsApp() async {
+    final agentId = widget.agentId;
+    logPublicLeadAgentId('ResultScreen._abrirWhatsApp', agentId);
+    if (agentId.isEmpty || agentId == 'default') {
+      _mostrarErroWhatsApp();
+      return;
+    }
+
+    try {
+      final agent = await AgentProvider.loadAgent(agentId);
+      final rawWhatsapp = agent.whatsapp.trim();
+      if (rawWhatsapp.isEmpty) {
+        _mostrarErroWhatsApp();
+        return;
+      }
+
+      final numero = _normalizarWhatsApp(rawWhatsapp);
+      if (numero.isEmpty) {
+        _mostrarErroWhatsApp();
+        return;
+      }
+
+      final agentName =
+          agent.nome.trim().isNotEmpty ? agent.nome.trim() : 'consultor';
+      final msg = _montarMensagemWhatsApp(agentName);
+      final url = 'https://wa.me/$numero?text=${Uri.encodeComponent(msg)}';
+
+      html.window.open(url, '_blank');
+    } catch (_) {
+      _mostrarErroWhatsApp();
+    }
+  }
+
+  /// Strips everything that is not a digit. If the result has 10 digits we
+  /// assume a US number and prepend "1" (the country code wa.me expects).
+  String _normalizarWhatsApp(String raw) {
+    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '';
+    if (digits.length == 10) return '1$digits';
+    return digits;
+  }
+
+  String _montarMensagemWhatsApp(String agentName) {
+    final plano = _plano;
+    final l = widget.lang;
+    final planoNome = plano['nome'] as String? ?? '';
+
+    if (l == 'es') {
+      return 'Hola $agentName! Soy ${widget.nome}, acabo de completar la prueba'
+          ' y mi puntuación de protección familiar es $_score% ($_scoreLabel).'
+          ' Plan recomendado: $planoNome. Me gustaría conversar sobre esto.';
+    }
+    if (l == 'en') {
+      return 'Hi $agentName! This is ${widget.nome}. I just took the test and'
+          ' my family protection score is $_score% ($_scoreLabel).'
+          ' Recommended plan: $planoNome. I would like to talk about it.';
+    }
+    return 'Olá $agentName! Sou ${widget.nome}, acabei de fazer o teste e meu'
+        ' Score de Proteção Familiar é $_score% ($_scoreLabel).'
+        ' Plano recomendado: $planoNome. Quero conversar sobre isso.';
+  }
+
+  void _mostrarErroWhatsApp() {
+    if (!mounted) return;
+    final l = widget.lang;
+    final msg = l == 'en'
+        ? 'Consultant temporarily unavailable. Please try again later.'
+        : l == 'es'
+            ? 'Consultor temporalmente no disponible. Inténtalo más tarde.'
+            : 'Consultor temporariamente indisponível. Tente novamente.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.blackCard,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final plano = _plano;
 
-    return Scaffold(
-      backgroundColor: AppColors.black,
-      body: WatermarkBackground(
+    return PublicLeadFlowScaffold(
+      lang: widget.lang,
+      child: WatermarkBackground(
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeIn,

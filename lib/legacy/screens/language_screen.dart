@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hitlook/legacy/debug/public_lead_agent_id_log.dart';
 import 'package:hitlook/legacy/screens/agent_login_screen.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/questions_screen.dart';
+import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
 
 class AppColors {
   static const black = Color(0xFF000000);
@@ -373,6 +375,7 @@ class _LanguageScreenState extends State<LanguageScreen>
   @override
   void initState() {
     super.initState();
+    logPublicLeadAgentId('LanguageScreen', widget.agentId);
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -411,9 +414,9 @@ class _LanguageScreenState extends State<LanguageScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.black,
-      body: WatermarkBackground(
+    return PublicLeadFlowScaffold(
+      lang: _selected,
+      child: WatermarkBackground(
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeIn,
@@ -426,9 +429,11 @@ class _LanguageScreenState extends State<LanguageScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 20),
-                    const M4LifeLogo(fontSize: 42),
-
-                    const SizedBox(height: 56),
+                    if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
+                      const M4LifeLogo(fontSize: 42),
+                      const SizedBox(height: 56),
+                    ] else
+                      const SizedBox(height: 12),
 
                     // Divisor dourado
                     Row(
@@ -656,6 +661,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
+    logPublicLeadAgentId('WelcomeScreen', widget.agentId);
     _loadAgent();
     _ctrl = AnimationController(
       vsync: this,
@@ -723,9 +729,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.black,
-      body: WatermarkBackground(
+    return PublicLeadFlowScaffold(
+      lang: widget.lang,
+      child: WatermarkBackground(
         child: SafeArea(
           bottom: true,
           child: FadeTransition(
@@ -739,9 +745,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   children: [
                     const SizedBox(height: 36),
 
-                    const M4LifeLogo(fontSize: 22, showTagline: true),
-
-                    const SizedBox(height: 16),
+                    if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
+                      const M4LifeLogo(fontSize: 22, showTagline: true),
+                      const SizedBox(height: 16),
+                    ],
 
                     // Card do agente
                     Padding(
@@ -974,6 +981,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void initState() {
     super.initState();
+    logPublicLeadAgentId('OnboardingScreen', widget.agentId);
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 600));
     _fadeIn = Tween<double>(begin: 0, end: 1).animate(
@@ -992,6 +1000,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   void _continuar() {
     if (_formKey.currentState!.validate()) {
+      logPublicLeadAgentId('OnboardingScreen→QuestionScreen', widget.agentId);
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
@@ -1000,6 +1009,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             nome: _nomeCtrl.text.trim(),
             telefone: _telCtrl.text.trim(),
             nascimento: _nascCtrl.text.trim(),
+            agentId: widget.agentId,
           ),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
@@ -1011,9 +1021,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.black,
-      body: WatermarkBackground(
+    return PublicLeadFlowScaffold(
+      lang: widget.lang,
+      child: WatermarkBackground(
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeIn,
@@ -1026,9 +1036,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   children: [
                     const SizedBox(height: 40),
 
-                    const M4LifeLogo(fontSize: 20, showTagline: true),
-
-                    const SizedBox(height: 32),
+                    if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
+                      const M4LifeLogo(fontSize: 20, showTagline: true),
+                      const SizedBox(height: 32),
+                    ],
 
                     // Linha dourada divisora
                     Container(

@@ -58,16 +58,38 @@ class Lead {
 
 enum LeadStatus {
   newLead,
-  qualified,
   contacted,
-  won,
+  followUp,
+  closed,
   lost;
 
+  /// Legacy values mapped for existing Firestore documents.
   static LeadStatus fromString(String? value) {
-    if (value == null || value == 'new') return LeadStatus.newLead;
+    if (value == null ||
+        value == 'new' ||
+        value == 'novo' ||
+        value == 'newLead') {
+      return LeadStatus.newLead;
+    }
+    if (value == 'qualified' || value == 'follow_up' || value == 'follow-up') {
+      return LeadStatus.followUp;
+    }
+    if (value == 'won' || value == 'fechado' || value == 'closed') {
+      return LeadStatus.closed;
+    }
+    if (value == 'contatado') return LeadStatus.contacted;
+    if (value == 'perdido') return LeadStatus.lost;
     return LeadStatus.values.firstWhere(
       (s) => s.name == value,
       orElse: () => LeadStatus.newLead,
     );
   }
+
+  String get labelPt => switch (this) {
+        LeadStatus.newLead => 'Novo',
+        LeadStatus.contacted => 'Contatado',
+        LeadStatus.followUp => 'Follow-up',
+        LeadStatus.closed => 'Fechado',
+        LeadStatus.lost => 'Perdido',
+      };
 }

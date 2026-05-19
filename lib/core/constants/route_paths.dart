@@ -3,8 +3,11 @@ abstract final class RoutePaths {
   static const root = '/';
   static const login = '/login';
   static const dashboard = '/dashboard';
+  static const admin = '/admin';
   static const sellerProfile = '/perfil';
   static const onboarding = '/onboarding';
+
+  static String adminSellerLeads(String sellerId) => '$admin/sellers/$sellerId';
 
   /// Public lead form: `/a/:sellerSlug`
   static const publicSellerPrefix = '/a';

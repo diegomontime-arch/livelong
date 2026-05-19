@@ -60,11 +60,39 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     }
   }
 
-  void _copyLink() {
+  Future<void> _copyLink() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    final link = 'https://hitlook-app.web.app/a/$uid';
-    Clipboard.setData(ClipboardData(text: link));
+
+    var publicId = uid;
+    try {
+      final userSnap =
+          await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      final companyId = userSnap.data()?['companyId'] as String?;
+      final sellerId = userSnap.data()?['sellerId'] as String?;
+      if (companyId != null && sellerId != null) {
+        final sellerSnap = await FirebaseFirestore.instance
+            .collection('companies')
+            .doc(companyId)
+            .collection('sellers')
+            .doc(sellerId)
+            .get();
+        final slug = sellerSnap.data()?['slug'] as String?;
+        if (slug != null && slug.isNotEmpty) publicId = slug;
+      }
+      final slugFromAgent = (await FirebaseFirestore.instance
+              .collection('agents')
+              .doc(uid)
+              .get())
+          .data()?['slug'] as String?;
+      if (slugFromAgent != null && slugFromAgent.isNotEmpty) {
+        publicId = slugFromAgent;
+      }
+    } catch (_) {}
+
+    final link = 'https://hitlook-app.web.app/a/$publicId';
+    await Clipboard.setData(ClipboardData(text: link));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Link copiado com sucesso!'),

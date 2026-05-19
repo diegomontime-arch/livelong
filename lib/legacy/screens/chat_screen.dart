@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:hitlook/legacy/debug/public_lead_agent_id_log.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
+import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
 
 class ChatScreen extends StatefulWidget {
   final String lang;
   final Map<String, dynamic> answers;
   final int score;
   final String nome;
+  final String agentId;
 
   const ChatScreen({
     super.key,
@@ -15,6 +18,7 @@ class ChatScreen extends StatefulWidget {
     required this.answers,
     required this.score,
     required this.nome,
+    this.agentId = 'default',
   });
 
   @override
@@ -137,6 +141,7 @@ YOU CANNOT:
   @override
   void initState() {
     super.initState();
+    logPublicLeadAgentId('ChatScreen', widget.agentId);
     _messages.add({'role': 'assistant', 'content': _greeting()});
   }
 
@@ -222,9 +227,9 @@ YOU CANNOT:
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.black,
-      body: WatermarkBackground(
+    return PublicLeadFlowScaffold(
+      lang: widget.lang,
+      child: WatermarkBackground(
         child: SafeArea(
           child: Column(
             children: [
