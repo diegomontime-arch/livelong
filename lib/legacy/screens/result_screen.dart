@@ -1,6 +1,5 @@
-import 'dart:html' as html;
-
 import 'package:flutter/material.dart';
+import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'living_benefit_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
@@ -270,52 +269,19 @@ class _ResultScreenState extends State<ResultScreen>
         return;
       }
 
-      final numero = _normalizarWhatsApp(rawWhatsapp);
-      if (numero.isEmpty) {
+      if (normalizeWhatsAppNumber(rawWhatsapp).isEmpty) {
         _mostrarErroWhatsApp();
         return;
       }
 
-      final agentName =
-          agent.nome.trim().isNotEmpty ? agent.nome.trim() : 'consultor';
-      final msg = _montarMensagemWhatsApp(agentName);
-      final url = 'https://wa.me/$numero?text=${Uri.encodeComponent(msg)}';
-
-      html.window.open(url, '_blank');
+      final msg = buildLeadWhatsAppMessage(lang: widget.lang, score: _score);
+      final opened = await openWhatsApp(phone: rawWhatsapp, message: msg);
+      if (!opened) _mostrarErroWhatsApp();
     } catch (_) {
       _mostrarErroWhatsApp();
     } finally {
       if (mounted) setState(() => _whatsAppLoading = false);
     }
-  }
-
-  /// Strips everything that is not a digit. If the result has 10 digits we
-  /// assume a US number and prepend "1" (the country code wa.me expects).
-  String _normalizarWhatsApp(String raw) {
-    final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.isEmpty) return '';
-    if (digits.length == 10) return '1$digits';
-    return digits;
-  }
-
-  String _montarMensagemWhatsApp(String agentName) {
-    final plano = _plano;
-    final l = widget.lang;
-    final planoNome = plano['nome'] as String? ?? '';
-
-    if (l == 'es') {
-      return 'Hola $agentName! Soy ${widget.nome}, acabo de completar la prueba'
-          ' y mi puntuación de protección familiar es $_score% ($_scoreLabel).'
-          ' Plan recomendado: $planoNome. Me gustaría conversar sobre esto.';
-    }
-    if (l == 'en') {
-      return 'Hi $agentName! This is ${widget.nome}. I just took the test and'
-          ' my family protection score is $_score% ($_scoreLabel).'
-          ' Recommended plan: $planoNome. I would like to talk about it.';
-    }
-    return 'Olá $agentName! Sou ${widget.nome}, acabei de fazer o teste e meu'
-        ' Score de Proteção Familiar é $_score% ($_scoreLabel).'
-        ' Plano recomendado: $planoNome. Quero conversar sobre isso.';
   }
 
   void _mostrarErroWhatsApp() {
