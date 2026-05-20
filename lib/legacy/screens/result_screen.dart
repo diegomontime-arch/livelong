@@ -1,6 +1,7 @@
 import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
+import 'living_benefit_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/chat_screen.dart';
@@ -241,6 +242,30 @@ class _ResultScreenState extends State<ResultScreen>
           ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
           child: child,
         ),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
+  }
+
+  void _abrirLivingBenefit() {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => LivingBenefitScreen(
+          lang: widget.lang,
+          onContinue: () {
+            Navigator.pop(context);
+            _abrirWhatsApp();
+          },
+        ),
+        transitionsBuilder: (_, anim, __, child) =>
+            SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 1),
+                end: Offset.zero,
+              ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+              child: child,
+            ),
         transitionDuration: const Duration(milliseconds: 400),
       ),
     );
@@ -733,7 +758,7 @@ class _ResultScreenState extends State<ResultScreen>
                     width: double.infinity,
                     height: 54,
                     child: OutlinedButton(
-                      onPressed: _abrirWhatsApp,
+                      onPressed: _abrirLivingBenefit,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.white,
                         side: BorderSide(
