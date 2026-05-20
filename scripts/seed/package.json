@@ -5,7 +5,11 @@
   "scripts": {
     "seed": "node seed.js",
     "seed:dry-run": "node seed.js --dry-run",
-    "seed:emulator": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node seed.js"
+    "seed:emulator": "cross-env FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099 node seed.js",
+    "setup:diego": "node setup_diego.js",
+    "setup:diego:dry-run": "node setup_diego.js --dry-run",
+    "setup:renan": "node setup_renan.js",
+    "setup:renan:dry-run": "node setup_renan.js --dry-run"
   },
   "engines": {
     "node": ">=20"
