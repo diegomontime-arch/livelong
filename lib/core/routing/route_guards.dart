@@ -35,6 +35,22 @@ Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
 
   if (!isLoggedIn) return null;
 
+  // Already signed in — leave login screen (avoids stuck loading on /login).
+  if (path == RoutePaths.login) {
+    return AdminSession.postLoginRoute();
+  }
+
+  // Dashboard and /perfil: legacy sellers need no `users/{uid}` document.
+  if (path == RoutePaths.sellerProfile) {
+    return null;
+  }
+
+  if (path == RoutePaths.dashboard) {
+    final session = await AdminSession.load();
+    if (session?.isAdmin == true) return RoutePaths.admin;
+    return null;
+  }
+
   final session = await AdminSession.load();
 
   if (isAdminPath) {
@@ -42,10 +58,6 @@ Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
       return RoutePaths.dashboard;
     }
     return null;
-  }
-
-  if (path == RoutePaths.dashboard && session?.isAdmin == true) {
-    return RoutePaths.admin;
   }
 
   return null;

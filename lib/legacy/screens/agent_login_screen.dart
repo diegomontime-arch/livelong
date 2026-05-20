@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -238,17 +239,29 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
         );
       }
 
-      debugPrint('[HitLook:auth] Firebase Auth OK uid=${FirebaseAuth.instance.currentUser?.uid}');
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      debugPrint('[HitLook:auth] Firebase Auth OK uid=$uid');
 
       if (!mounted) return;
+
       final route = await AdminSession.postLoginRoute();
       debugPrint('[HitLook:auth] navigating → $route');
+
+      setState(() => _loading = false);
+      if (!mounted) return;
       context.go(route);
+      return;
     } on FirebaseAuthException catch (e, st) {
       debugPrint('[HitLook:auth] FirebaseAuthException: ${e.code} ${e.message}\n$st');
       setState(() {
         _erro = _traduzirErro(e.code);
       });
+    } on FirebaseException catch (e, st) {
+      // Auth succeeded; Firestore profile optional for legacy sellers.
+      debugPrint('[HitLook:auth] Firestore after login: ${e.code} ${e.message}\n$st');
+      setState(() => _loading = false);
+      if (mounted) context.go(RoutePaths.dashboard);
+      return;
     } catch (e, st) {
       debugPrint('[HitLook:auth] login unexpected: $e\n$st');
       setState(() {
