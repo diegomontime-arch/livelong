@@ -18,18 +18,28 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
 
   final _emailCtrl = TextEditingController();
   final _senhaCtrl = TextEditingController();
+  final _novaSenhaCtrl = TextEditingController();
+  final _confirmarSenhaCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _resetFormKey = GlobalKey<FormState>();
 
   bool _loading = false;
   bool _resetLoading = false;
+  bool _confirmResetLoading = false;
   bool _senhaVisivel = false;
+  bool _novaSenhaVisivel = false;
   bool _isCadastro = false;
   String? _erro;
   String? _sucesso;
+  String? _oobCode;
+  bool _definirNovaSenha = false;
+
+  static const _resetContinueUrl = 'https://hitlook-app.web.app/login';
 
   @override
   void initState() {
     super.initState();
+    _verificarLinkRedefinicaoSenha();
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -45,11 +55,71 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     _ctrl.dispose();
     _emailCtrl.dispose();
     _senhaCtrl.dispose();
+    _novaSenhaCtrl.dispose();
+    _confirmarSenhaCtrl.dispose();
     super.dispose();
   }
 
+  /// Link do e-mail: /login?mode=resetPassword&oobCode=...
+  void _verificarLinkRedefinicaoSenha() {
+    final params = Uri.base.queryParameters;
+    final mode = params['mode'];
+    final code = params['oobCode'];
+    if (mode == 'resetPassword' && code != null && code.isNotEmpty) {
+      _oobCode = code;
+      _definirNovaSenha = true;
+    }
+  }
+
+  Future<void> _confirmarNovaSenha() async {
+    if (!_resetFormKey.currentState!.validate()) return;
+    final code = _oobCode;
+    if (code == null || code.isEmpty) {
+      setState(() {
+        _erro = 'Link inválido ou expirado. Solicite um novo e-mail.';
+        _sucesso = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _confirmResetLoading = true;
+      _erro = null;
+      _sucesso = null;
+    });
+
+    try {
+      await FirebaseAuth.instance.verifyPasswordResetCode(code);
+      await FirebaseAuth.instance.confirmPasswordReset(
+        code: code,
+        newPassword: _novaSenhaCtrl.text,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _definirNovaSenha = false;
+        _oobCode = null;
+        _novaSenhaCtrl.clear();
+        _confirmarSenhaCtrl.clear();
+        _sucesso =
+            'Senha alterada com sucesso! Use a nova senha abaixo para entrar.';
+      });
+      context.go('/login');
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _erro = _traduzirErroConfirmReset(e.code);
+      });
+    } catch (_) {
+      setState(() {
+        _erro = 'Não foi possível alterar a senha. Solicite um novo link.';
+      });
+    }
+
+    if (mounted) setState(() => _confirmResetLoading = false);
+  }
+
   Future<void> _recuperarSenha() async {
-    final email = _emailCtrl.text.trim();
+    final email = _emailCtrl.text.trim().toLowerCase();
 
     if (email.isEmpty) {
       setState(() {
@@ -74,10 +144,18 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     });
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: email,
+        actionCodeSettings: ActionCodeSettings(
+          url: _resetContinueUrl,
+          handleCodeInApp: false,
+        ),
+      );
       if (mounted) {
         setState(() {
-          _sucesso = 'Enviamos um link de recuperação para seu e-mail.';
+          _sucesso =
+              'Enviamos um link para $email. Abra o e-mail (ou spam), '
+              'defina a nova senha no link e só então volte aqui para entrar.';
         });
       }
     } on FirebaseAuthException catch (e) {
@@ -102,15 +180,18 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     });
 
     try {
+      final email = _emailCtrl.text.trim().toLowerCase();
+      final password = _senhaCtrl.text;
+
       if (_isCadastro) {
         await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: _emailCtrl.text.trim(),
-          password: _senhaCtrl.text.trim(),
+          email: email,
+          password: password,
         );
       } else {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: _emailCtrl.text.trim(),
-          password: _senhaCtrl.text.trim(),
+          email: email,
+          password: password,
         );
       }
 
@@ -165,8 +246,26 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     }
   }
 
+  String _traduzirErroConfirmReset(String code) {
+    switch (code) {
+      case 'expired-action-code':
+        return 'Este link expirou. Clique em "Esqueceu a senha?" e solicite outro.';
+      case 'invalid-action-code':
+        return 'Link inválido. Solicite um novo e-mail de recuperação.';
+      case 'weak-password':
+        return 'Senha fraca. Use pelo menos 6 caracteres.';
+      case 'user-disabled':
+        return 'Esta conta está desativada. Fale com o suporte.';
+      default:
+        return 'Não foi possível definir a nova senha. Tente solicitar outro link.';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_definirNovaSenha) {
+      return _buildDefinirNovaSenha(context);
+    }
     return Scaffold(
       backgroundColor: AppColors.black,
       body: WatermarkBackground(
@@ -576,6 +675,175 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                     const SizedBox(height: 24),
                   ],
                 ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefinirNovaSenha(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.black,
+      body: WatermarkBackground(
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Form(
+              key: _resetFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 24),
+                  const M4LifeLogo(fontSize: 22, showTagline: false),
+                  const SizedBox(height: 32),
+                  Container(width: 40, height: 2, color: AppColors.gold),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'NOVA SENHA',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.white,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Defina sua nova senha abaixo. Depois volte ao login.',
+                    style: TextStyle(fontSize: 14, color: AppColors.greyLight),
+                  ),
+                  const SizedBox(height: 28),
+                  const Text(
+                    'NOVA SENHA',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.greyLight,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _novaSenhaCtrl,
+                    obscureText: !_novaSenhaVisivel,
+                    style: const TextStyle(color: AppColors.whiteWarm),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Digite a nova senha';
+                      if (v.length < 6) return 'Mínimo 6 caracteres';
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      hintText: '••••••••',
+                      filled: true,
+                      fillColor: AppColors.blackCard,
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _novaSenhaVisivel
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          color: AppColors.greyLight,
+                          size: 18,
+                        ),
+                        onPressed: () => setState(
+                          () => _novaSenhaVisivel = !_novaSenhaVisivel,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(
+                          color: AppColors.gold.withOpacity(0.15),
+                        ),
+                      ),
+                      focusedBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(6)),
+                        borderSide: BorderSide(color: AppColors.gold),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'CONFIRMAR SENHA',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.greyLight,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _confirmarSenhaCtrl,
+                    obscureText: !_novaSenhaVisivel,
+                    style: const TextStyle(color: AppColors.whiteWarm),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) {
+                        return 'Confirme a nova senha';
+                      }
+                      if (v != _novaSenhaCtrl.text) {
+                        return 'As senhas não coincidem';
+                      }
+                      return null;
+                    },
+                    decoration: InputDecoration(
+                      hintText: '••••••••',
+                      filled: true,
+                      fillColor: AppColors.blackCard,
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        borderSide: BorderSide(
+                          color: AppColors.gold.withOpacity(0.15),
+                        ),
+                      ),
+                      focusedBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(6)),
+                        borderSide: BorderSide(color: AppColors.gold),
+                      ),
+                    ),
+                  ),
+                  if (_erro != null) ...[
+                    const SizedBox(height: 12),
+                    Text(_erro!, style: const TextStyle(color: Color(0xFFE74C3C))),
+                  ],
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed:
+                          _confirmResetLoading ? null : _confirmarNovaSenha,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.gold,
+                        foregroundColor: AppColors.black,
+                      ),
+                      child: _confirmResetLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.black,
+                              ),
+                            )
+                          : const Text(
+                              'SALVAR NOVA SENHA',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.go('/login'),
+                      child: const Text(
+                        'Voltar ao login',
+                        style: TextStyle(color: AppColors.gold),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
