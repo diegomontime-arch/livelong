@@ -555,11 +555,6 @@ class _ResultScreenState extends State<ResultScreen>
 
                   const SizedBox(height: 24),
 
-                  // ── BENEFÍCIO EM VIDA ──────────
-                  _LivingBenefitCards(lang: widget.lang),
-
-                  const SizedBox(height: 24),
-
                   // ── CALCULADORA ────────────────
                   Row(
                     children: [
@@ -701,6 +696,11 @@ class _ResultScreenState extends State<ResultScreen>
                       ],
                     ),
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // ── BENEFÍCIO EM VIDA ──────────
+                  _LivingBenefitCards(lang: widget.lang),
 
                   const SizedBox(height: 24),
 

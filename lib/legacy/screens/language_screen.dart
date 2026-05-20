@@ -1086,8 +1086,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       label: _t('birth'),
                       hint: _t('birth_h'),
                       icon: Icons.cake_outlined,
-                      tipo: TextInputType.datetime,
+                      tipo: TextInputType.number,
                       erro: _t('e_birth'),
+                      inputFormatters: [_DateInputFormatter()],
                     ),
 
                     const SizedBox(height: 14),
@@ -1151,6 +1152,7 @@ class _Campo extends StatelessWidget {
   final IconData icon;
   final TextInputType tipo;
   final String erro;
+  final List<TextInputFormatter>? inputFormatters;
 
   const _Campo({
     required this.ctrl,
@@ -1159,6 +1161,7 @@ class _Campo extends StatelessWidget {
     required this.icon,
     required this.tipo,
     required this.erro,
+    this.inputFormatters,
   });
 
   @override
@@ -1176,6 +1179,7 @@ class _Campo extends StatelessWidget {
         TextFormField(
           controller: ctrl,
           keyboardType: tipo,
+          inputFormatters: inputFormatters,
           style: const TextStyle(
               color: AppColors.whiteWarm, fontSize: 15),
           validator: (v) =>

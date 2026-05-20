@@ -93,6 +93,28 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     if (mounted) setState(() => _resetLoading = false);
   }
 
+  Future<void> _esqueceuSenha() async {
+    if (_emailCtrl.text.trim().isEmpty) {
+      setState(() => _erro = 'Digite seu email primeiro.');
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: _emailCtrl.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email de recuperação enviado!'),
+            backgroundColor: AppColors.gold,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _erro = 'Erro ao enviar email. Verifique o endereço.');
+    }
+  }
+
   Future<void> _entrar() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -480,6 +502,23 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 8),
+
+                    // Esqueceu senha
+                    if (!_isCadastro)
+                      Center(
+                        child: GestureDetector(
+                          onTap: _esqueceuSenha,
+                          child: Text(
+                            'Esqueceu a senha?',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.greyLight,
+                            ),
+                          ),
+                        ),
+                      ),
 
                     const SizedBox(height: 32),
 
