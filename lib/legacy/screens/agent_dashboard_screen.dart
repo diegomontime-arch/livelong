@@ -96,6 +96,32 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     }
   }
 
+  Future<void> _updateLeadStatus(
+    Map<String, dynamic> lead,
+    String status,
+  ) async {
+    final id = lead['id'] as String?;
+    if (id == null) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('leads').doc(id).update({
+        'status': status,
+      });
+      if (!mounted) return;
+      setState(() {
+        lead['status'] = status;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro ao atualizar status: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   Future<void> _loadMore() async {
     if (_loadingMore || !_hasMore || _leads.isEmpty) return;
     final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -507,7 +533,11 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                                       ),
                                     );
                                   }
-                                  return _LeadCard(lead: _leads[i]);
+                                  return _LeadCard(
+                                    lead: _leads[i],
+                                    onStatusChanged: (status) =>
+                                        _updateLeadStatus(_leads[i], status),
+                                  );
                                 },
                               ),
                       ),
@@ -520,41 +550,43 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   }
 }
 
+class _LeadStatusOption {
+  const _LeadStatusOption(this.value, this.label, this.color);
+  final String value;
+  final String label;
+  final Color color;
+}
+
+const _leadStatusOptions = [
+  _LeadStatusOption('novo', 'Novo', AppColors.gold),
+  _LeadStatusOption('contatado', 'Contatado', Color(0xFFF39C12)),
+  _LeadStatusOption('fechado', 'Fechado', Color(0xFF2ECC71)),
+  _LeadStatusOption('perdido', 'Perdido', Color(0xFF888888)),
+];
+
+_LeadStatusOption _statusMeta(String status) {
+  return _leadStatusOptions.firstWhere(
+    (o) => o.value == status,
+    orElse: () => _leadStatusOptions.first,
+  );
+}
+
 class _LeadCard extends StatelessWidget {
   final Map<String, dynamic> lead;
+  final ValueChanged<String> onStatusChanged;
 
-  const _LeadCard({required this.lead});
+  const _LeadCard({
+    required this.lead,
+    required this.onStatusChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
     final nome = lead['nome'] ?? 'Nome não informado';
     final telefone = lead['telefone'] ?? '';
     final score = lead['score'] ?? 0;
-    final status = lead['status'] ?? 'novo';
-
-    Color statusColor;
-    String statusLabel;
-    switch (status) {
-      case 'quente':
-        statusColor = const Color(0xFFE74C3C);
-        statusLabel = 'Quente';
-        break;
-      case 'contatado':
-        statusColor = const Color(0xFFF39C12);
-        statusLabel = 'Contatado';
-        break;
-      case 'fechado':
-        statusColor = const Color(0xFF2ECC71);
-        statusLabel = 'Fechado';
-        break;
-      case 'perdido':
-        statusColor = AppColors.grey;
-        statusLabel = 'Perdido';
-        break;
-      default:
-        statusColor = AppColors.gold;
-        statusLabel = 'Novo';
-    }
+    final status = lead['status'] as String? ?? 'novo';
+    final meta = _statusMeta(status);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -622,28 +654,49 @@ class _LeadCard extends StatelessWidget {
             ),
           ),
 
-          // Status
-          Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(4),
-              border: Border.all(
-                color: statusColor.withOpacity(0.3),
-              ),
-            ),
-            child: Text(
-              statusLabel,
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: status,
+              dropdownColor: AppColors.blackCard,
+              borderRadius: BorderRadius.circular(8),
+              icon: Icon(Icons.expand_more, size: 18, color: meta.color),
               style: TextStyle(
-                fontSize: 10,
-                color: statusColor,
+                fontSize: 11,
+                color: meta.color,
                 fontWeight: FontWeight.w600,
               ),
+              items: _leadStatusOptions
+                  .map(
+                    (o) => DropdownMenuItem(
+                      value: o.value,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: o.color,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            o.label,
+                            style: TextStyle(color: o.color, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null && v != status) onStatusChanged(v);
+              },
             ),
           ),
 
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
 
           // WhatsApp
           if (telefone.isNotEmpty)

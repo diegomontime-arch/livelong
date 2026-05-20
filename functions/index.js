@@ -1,8 +1,14 @@
 const functions = require("firebase-functions");
+const admin = require("firebase-admin");
 const https = require("https");
 
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+const db = admin.firestore();
+
 exports.anthropicProxy = functions.https.onRequest((req, res) => {
-  // CORS
   res.set("Access-Control-Allow-Origin", "*");
   res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type");
@@ -47,3 +53,92 @@ exports.anthropicProxy = functions.https.onRequest((req, res) => {
   proxyReq.write(body);
   proxyReq.end();
 });
+
+const LANG_LABEL = { pt: "Português", es: "Español", en: "English" };
+
+/**
+ * Queues an email via the Firestore "Trigger Email" extension (`mail` collection).
+ * Install: Firebase Console → Extensions → Trigger Email from Firestore.
+ */
+exports.notifyAgentOnNewLead = functions.firestore
+  .document("leads/{leadId}")
+  .onCreate(async (snap) => {
+    const lead = snap.data();
+    const agentId = lead.agentId;
+    if (!agentId) {
+      functions.logger.warn("Lead without agentId", snap.id);
+      return null;
+    }
+
+    const email = await resolveAgentEmail(agentId);
+    if (!email) {
+      functions.logger.warn("No email for agent", agentId);
+      return null;
+    }
+
+    const nome = lead.nome || "Prospect";
+    const telefone = lead.telefone || "—";
+    const score = lead.score != null ? `${lead.score}%` : "—";
+    const lang = LANG_LABEL[lead.lang] || lead.lang || "—";
+
+    const subject = `Novo lead HitLook: ${nome}`;
+    const text =
+      `Você recebeu um novo lead no HitLook.\n\n` +
+      `Nome: ${nome}\n` +
+      `Telefone: ${telefone}\n` +
+      `Score: ${score}\n` +
+      `Idioma: ${lang}\n\n` +
+      `Acesse seu painel: https://hitlook-app.web.app/dashboard`;
+
+    const html =
+      `<h2>Novo lead HitLook</h2>` +
+      `<p><strong>Nome:</strong> ${escapeHtml(nome)}</p>` +
+      `<p><strong>Telefone:</strong> ${escapeHtml(telefone)}</p>` +
+      `<p><strong>Score:</strong> ${escapeHtml(String(score))}</p>` +
+      `<p><strong>Idioma:</strong> ${escapeHtml(lang)}</p>` +
+      `<p><a href="https://hitlook-app.web.app/dashboard">Abrir painel</a></p>`;
+
+    await db.collection("mail").add({
+      to: email,
+      message: { subject, text, html },
+    });
+
+    functions.logger.info("Queued lead email", { leadId: snap.id, to: email });
+    return null;
+  });
+
+async function resolveAgentEmail(agentId) {
+  const userDoc = await db.collection("users").doc(agentId).get();
+  if (userDoc.exists) {
+    const email = userDoc.data().email;
+    if (email) return email;
+  }
+
+  const agentDoc = await db.collection("agents").doc(agentId).get();
+  if (agentDoc.exists) {
+    const data = agentDoc.data();
+    if (data.email) return data.email;
+    const uid = data.userId;
+    if (uid) {
+      const u = await db.collection("users").doc(uid).get();
+      if (u.exists && u.data().email) return u.data().email;
+    }
+  }
+
+  try {
+    const authUser = await admin.auth().getUser(agentId);
+    if (authUser.email) return authUser.email;
+  } catch (_) {
+    // not a Firebase Auth uid
+  }
+
+  return null;
+}
+
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
