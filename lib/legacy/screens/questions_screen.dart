@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/screens/result_screen.dart';
+import 'package:hitlook/legacy/widgets/flow_ux.dart';
 import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
 
 class QuestionScreen extends StatefulWidget {
@@ -29,6 +30,8 @@ class _QuestionScreenState extends State<QuestionScreen>
   final Map<String, dynamic> _answers = {};
   late AnimationController _ctrl;
   late Animation<double> _fade;
+  final ScrollController _optionsScroll = ScrollController();
+  bool _navigating = false;
 
   List<Map<String, dynamic>> get _questions {
     final l = widget.lang;
@@ -250,8 +253,10 @@ class _QuestionScreenState extends State<QuestionScreen>
         setState(() => _current++);
         _ctrl.reset();
         _ctrl.forward();
+        _scrollToTop();
       } else {
-        Navigator.pushReplacement(
+        setState(() => _navigating = true);
+        Navigator.push(
           context,
           PageRouteBuilder(
             pageBuilder: (_, __, ___) => ResultScreen(
@@ -266,9 +271,32 @@ class _QuestionScreenState extends State<QuestionScreen>
                 FadeTransition(opacity: anim, child: child),
             transitionDuration: const Duration(milliseconds: 500),
           ),
-        );
+        ).then((_) {
+          if (mounted) setState(() => _navigating = false);
+        });
       }
     });
+  }
+
+  void _scrollToTop() {
+    if (_optionsScroll.hasClients) {
+      _optionsScroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _goBack() {
+    if (_current > 0) {
+      setState(() => _current--);
+      _ctrl.reset();
+      _ctrl.forward();
+      _scrollToTop();
+    } else {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -287,6 +315,7 @@ class _QuestionScreenState extends State<QuestionScreen>
   @override
   void dispose() {
     _ctrl.dispose();
+    _optionsScroll.dispose();
     super.dispose();
   }
 
@@ -295,45 +324,27 @@ class _QuestionScreenState extends State<QuestionScreen>
     final q = _questions[_current];
     final progress = (_current + 1) / _questions.length;
 
-    return PublicLeadFlowScaffold(
+    return FlowExitGuard(
       lang: widget.lang,
-      child: WatermarkBackground(
-        child: SafeArea(
-          child: FadeTransition(
-            opacity: _fade,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 20),
+      child: PublicLeadFlowScaffold(
+        lang: widget.lang,
+        child: WatermarkBackground(
+          child: SafeArea(
+            child: FadeTransition(
+              opacity: _fade,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    FlowBackButton(onPressed: _goBack),
+                    const SizedBox(height: 12),
 
                   // Header
                   Row(
                     children: [
-                      if (_current > 0)
-                        GestureDetector(
-                          onTap: () {
-                            setState(() => _current--);
-                            _ctrl.reset();
-                            _ctrl.forward();
-                          },
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: AppColors.blackCard,
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: AppColors.gold.withOpacity(0.2),
-                              ),
-                            ),
-                            child: Icon(Icons.arrow_back,
-                                size: 16, color: AppColors.gold),
-                          ),
-                        )
-                      else
-                        const SizedBox(width: 36),
+                      const SizedBox(width: 0),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -416,8 +427,18 @@ class _QuestionScreenState extends State<QuestionScreen>
 
                   const SizedBox(height: 24),
 
+                  if (_navigating)
+                    const Expanded(
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.gold,
+                        ),
+                      ),
+                    )
+                  else
                   Expanded(
                     child: ListView.separated(
+                      controller: _optionsScroll,
                       itemCount: (q['opcoes'] as List).length,
                       separatorBuilder: (_, __) =>
                           const SizedBox(height: 10),
@@ -450,6 +471,7 @@ class _QuestionScreenState extends State<QuestionScreen>
           ),
         ),
       ),
+    ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
+import 'package:hitlook/legacy/widgets/flow_ux.dart';
 
 class AgentDashboardScreen extends StatefulWidget {
   const AgentDashboardScreen({super.key});
@@ -16,7 +17,11 @@ class AgentDashboardScreen extends StatefulWidget {
 class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   AgentProfile _agent = AgentProfile.defaultProfile;
   bool _loading = true;
+  bool _loadingMore = false;
+  String? _loadError;
   List<Map<String, dynamic>> _leads = [];
+  bool _hasMore = true;
+  static const _pageSize = 15;
 
   @override
   void initState() {
@@ -24,39 +29,100 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     _loadData();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool refresh = false}) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    try {
-      // Carrega perfil do agente
-      final agentDoc = await FirebaseFirestore.instance
-          .collection('agents')
-          .doc(uid)
-          .get();
+    if (refresh) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+        _hasMore = true;
+      });
+    }
 
-      if (agentDoc.exists && agentDoc.data() != null) {
-        setState(() {
-          _agent = AgentProfile.fromMap(uid, agentDoc.data()!);
-        });
+    try {
+      final agentDoc = await runWithTimeout(
+        () => FirebaseFirestore.instance.collection('agents').doc(uid).get(),
+      );
+
+      if (agentDoc != null && agentDoc.exists && agentDoc.data() != null) {
+        if (mounted) {
+          setState(() {
+            _agent = AgentProfile.fromMap(uid, agentDoc.data()!);
+          });
+        }
       }
 
-      // Carrega leads
-      final leadsSnapshot = await FirebaseFirestore.instance
+      final leadsSnapshot = await runWithTimeout(
+        () => FirebaseFirestore.instance
+            .collection('leads')
+            .where('agentId', isEqualTo: uid)
+            .orderBy('createdAt', descending: true)
+            .limit(_pageSize)
+            .get(),
+      );
+
+      if (leadsSnapshot == null) {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _loadError =
+                'Demorou demais para carregar. Verifique sua conexão e tente novamente.';
+          });
+        }
+        return;
+      }
+
+      if (mounted) {
+        setState(() {
+          _leads = leadsSnapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList();
+          _hasMore = leadsSnapshot.docs.length >= _pageSize;
+          _loading = false;
+          _loadError = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = isNetworkError(e)
+              ? 'Sem conexão com a internet. Puxe para atualizar.'
+              : 'Não foi possível carregar seus leads. Tente novamente.';
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || !_hasMore || _leads.isEmpty) return;
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    setState(() => _loadingMore = true);
+    try {
+      final lastCreatedAt = _leads.last['createdAt'];
+      final snapshot = await FirebaseFirestore.instance
           .collection('leads')
           .where('agentId', isEqualTo: uid)
           .orderBy('createdAt', descending: true)
-          .limit(50)
+          .startAfter([lastCreatedAt])
+          .limit(_pageSize)
           .get();
 
-      setState(() {
-        _leads = leadsSnapshot.docs
-            .map((doc) => {'id': doc.id, ...doc.data()})
-            .toList();
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _leads.addAll(
+            snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}),
+          );
+          _hasMore = snapshot.docs.length >= _pageSize;
+          _loadingMore = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -114,9 +180,13 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
       body: WatermarkBackground(
         child: SafeArea(
           child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.gold))
-              : Column(
+              ? const FlowLoadingView(message: 'Carregando seu painel...')
+              : _loadError != null && _leads.isEmpty
+                  ? FlowErrorView(
+                      message: _loadError!,
+                      onRetry: () => _loadData(refresh: true),
+                    )
+                  : Column(
                   children: [
                     // Header
                     Container(
@@ -368,48 +438,79 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                     const SizedBox(height: 12),
 
                     Expanded(
-                      child: _leads.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
+                      child: RefreshIndicator(
+                        color: AppColors.gold,
+                        onRefresh: () => _loadData(refresh: true),
+                        child: _leads.isEmpty
+                            ? ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: const [
+                                  SizedBox(height: 80),
                                   Icon(
                                     Icons.people_outline,
                                     size: 48,
-                                    color: AppColors.grey.withOpacity(0.4),
+                                    color: AppColors.grey,
                                   ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Nenhum lead ainda',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      color: AppColors.grey,
+                                  SizedBox(height: 16),
+                                  Center(
+                                    child: Text(
+                                      'Nenhum lead ainda',
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        color: AppColors.greyLight,
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Copie o link acima e envie para seus contatos',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color:
-                                          AppColors.grey.withOpacity(0.6),
+                                  SizedBox(height: 8),
+                                  Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 32),
+                                    child: Text(
+                                      'Copie seu link personalizado acima e envie para seus contatos no WhatsApp.',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: AppColors.grey,
+                                      ),
+                                      textAlign: TextAlign.center,
                                     ),
-                                    textAlign: TextAlign.center,
                                   ),
                                 ],
+                              )
+                            : ListView.separated(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16),
+                                itemCount:
+                                    _leads.length + (_hasMore ? 1 : 0),
+                                separatorBuilder: (_, __) =>
+                                    const SizedBox(height: 10),
+                                itemBuilder: (_, i) {
+                                  if (i == _leads.length) {
+                                    return Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      child: Center(
+                                        child: _loadingMore
+                                            ? const CircularProgressIndicator(
+                                                color: AppColors.gold,
+                                                strokeWidth: 2,
+                                              )
+                                            : TextButton(
+                                                onPressed: _loadMore,
+                                                child: const Text(
+                                                  'Carregar mais',
+                                                  style: TextStyle(
+                                                    color: AppColors.gold,
+                                                  ),
+                                                ),
+                                              ),
+                                      ),
+                                    );
+                                  }
+                                  return _LeadCard(lead: _leads[i]);
+                                },
                               ),
-                            )
-                          : ListView.separated(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16),
-                              itemCount: _leads.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(height: 10),
-                              itemBuilder: (_, i) {
-                                final lead = _leads[i];
-                                return _LeadCard(lead: lead);
-                              },
-                            ),
+                      ),
                     ),
                   ],
                 ),
@@ -510,6 +611,13 @@ class _LeadCard extends StatelessWidget {
                       color: AppColors.greyLight,
                     ),
                   ),
+                Text(
+                  formatLeadDate(lead['createdAt']),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.grey.withOpacity(0.8),
+                  ),
+                ),
               ],
             ),
           ),

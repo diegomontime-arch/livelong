@@ -93,28 +93,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     if (mounted) setState(() => _resetLoading = false);
   }
 
-  Future<void> _esqueceuSenha() async {
-    if (_emailCtrl.text.trim().isEmpty) {
-      setState(() => _erro = 'Digite seu email primeiro.');
-      return;
-    }
-    try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailCtrl.text.trim(),
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email de recuperação enviado!'),
-            backgroundColor: AppColors.gold,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() => _erro = 'Erro ao enviar email. Verifique o endereço.');
-    }
-  }
-
   Future<void> _entrar() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -202,7 +180,30 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 48),
+                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => context.go('/'),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.blackCard,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: AppColors.gold.withOpacity(0.25),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back,
+                            size: 18,
+                            color: AppColors.gold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
                     const M4LifeLogo(fontSize: 22, showTagline: true),
 
@@ -502,23 +503,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 8),
-
-                    // Esqueceu senha
-                    if (!_isCadastro)
-                      Center(
-                        child: GestureDetector(
-                          onTap: _esqueceuSenha,
-                          child: Text(
-                            'Esqueceu a senha?',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.greyLight,
-                            ),
-                          ),
-                        ),
-                      ),
 
                     const SizedBox(height: 32),
 

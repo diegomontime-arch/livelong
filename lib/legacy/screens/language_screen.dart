@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/legacy/screens/agent_login_screen.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/questions_screen.dart';
+import 'package:hitlook/legacy/widgets/flow_ux.dart';
 import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
 
 class AppColors {
@@ -398,7 +400,7 @@ class _LanguageScreenState extends State<LanguageScreen>
     setState(() => _selected = lang);
     Future.delayed(const Duration(milliseconds: 320), () {
       if (!mounted) return;
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => WelcomeScreen(lang: lang, agentId: widget.agentId),
@@ -655,6 +657,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
   AgentProfile _agent = AgentProfile.defaultProfile;
+  bool _loadingAgent = true;
+  bool _agentNotFound = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -675,8 +680,52 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   }
 
   Future<void> _loadAgent() async {
-    final agent = await AgentProvider.loadAgent(widget.agentId);
-    if (mounted) setState(() => _agent = agent);
+    setState(() {
+      _loadingAgent = true;
+      _agentNotFound = false;
+      _loadError = null;
+    });
+
+    try {
+      final agent = await runWithTimeout(
+        () => AgentProvider.loadAgent(widget.agentId),
+      );
+
+      if (!mounted) return;
+
+      if (agent == null) {
+        setState(() {
+          _loadError = widget.lang == 'en'
+              ? 'Loading took too long. Check your connection and try again.'
+              : widget.lang == 'es'
+                  ? 'La carga tardó demasiado. Verifica tu conexión.'
+                  : 'Demorou demais para carregar. Verifique sua conexão.';
+          _loadingAgent = false;
+        });
+        return;
+      }
+
+      final notFound = !isRealPublicAgent(agent, widget.agentId);
+      setState(() {
+        _agent = agent;
+        _agentNotFound = notFound;
+        _loadingAgent = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingAgent = false;
+        _loadError = isNetworkError(e)
+            ? (widget.lang == 'en'
+                ? 'No internet connection. Try again.'
+                : widget.lang == 'es'
+                    ? 'Sin conexión. Intenta de nuevo.'
+                    : 'Sem conexão. Tente novamente.')
+            : (widget.lang == 'en'
+                ? 'Could not load profile.'
+                : 'No se pudo cargar el perfil.');
+      });
+    }
   }
 
   @override
@@ -726,23 +775,60 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return PublicLeadFlowScaffold(
-      lang: widget.lang,
-      child: WatermarkBackground(
-        child: SafeArea(
-          bottom: true,
-          child: FadeTransition(
-            opacity: _fadeIn,
-            child: SlideTransition(
-              position: _slideUp,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 36),
+    if (_agentNotFound) {
+      return AgentNotFoundScreen(lang: widget.lang, agentId: widget.agentId);
+    }
 
-                    if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
+    if (_loadError != null) {
+      return Scaffold(
+        backgroundColor: AppColors.black,
+        body: WatermarkBackground(
+          child: SafeArea(
+            child: Column(
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
+                  child: FlowBackButton(),
+                ),
+                Expanded(
+                  child: FlowErrorView(
+                    message: _loadError!,
+                    onRetry: _loadAgent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return FlowExitGuard(
+      lang: widget.lang,
+      child: PublicLeadFlowScaffold(
+        lang: widget.lang,
+        child: WatermarkBackground(
+          child: SafeArea(
+            bottom: true,
+            child: _loadingAgent
+                ? const FlowLoadingView(
+                    message: 'Carregando perfil do consultor...',
+                  )
+                : FadeTransition(
+                    opacity: _fadeIn,
+                    child: SlideTransition(
+                      position: _slideUp,
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            const FlowBackButton(),
+                            const SizedBox(height: 20),
+
+                            if (!PublicLeadFlowScaffold.isDesktopLayout(
+                                context)) ...[
                       const M4LifeLogo(fontSize: 22, showTagline: true),
                       const SizedBox(height: 16),
                     ],
@@ -811,6 +897,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ),
 
+                    const SizedBox(height: 24),
 
                     _BenefitRow(
                         icon: Icons.access_time_outlined,
@@ -872,11 +959,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 100),
-                  ],
-                ),
-              ),
-            ),
+                            const SizedBox(height: 100),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),
@@ -932,6 +1020,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   final _telCtrl = TextEditingController();
   final _nascCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _submitting = false;
 
   final _texts = {
     'pt': {
@@ -945,6 +1034,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'e_name': 'Digite seu nome',
       'e_phone': 'Digite seu telefone',
       'e_birth': 'Digite sua data de nascimento',
+      'e_birth_fmt': 'Use o formato MM/DD/AAAA',
     },
     'es': {
       'title': 'ANTES DE EMPEZAR',
@@ -957,6 +1047,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'e_name': 'Escribe tu nombre',
       'e_phone': 'Escribe tu teléfono',
       'e_birth': 'Escribe tu fecha de nacimiento',
+      'e_birth_fmt': 'Usa el formato MM/DD/AAAA',
     },
     'en': {
       'title': 'BEFORE WE START',
@@ -969,6 +1060,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'e_name': 'Enter your name',
       'e_phone': 'Enter your phone',
       'e_birth': 'Enter your date of birth',
+      'e_birth_fmt': 'Use MM/DD/YYYY format',
     },
   };
 
@@ -995,8 +1087,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _continuar() {
-    if (_formKey.currentState!.validate()) {
-      Navigator.pushReplacement(
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _submitting = true);
+    Navigator.push(
         context,
         PageRouteBuilder(
           pageBuilder: (_, __, ___) => QuestionScreen(
@@ -1010,33 +1103,38 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 400),
         ),
-      );
-    }
+      ).then((_) {
+        if (mounted) setState(() => _submitting = false);
+      });
   }
 
   @override
   Widget build(BuildContext context) {
-    return PublicLeadFlowScaffold(
+    return FlowExitGuard(
       lang: widget.lang,
-      child: WatermarkBackground(
-        child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeIn,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 40),
+      child: PublicLeadFlowScaffold(
+        lang: widget.lang,
+        child: WatermarkBackground(
+          child: SafeArea(
+            child: FadeTransition(
+              opacity: _fadeIn,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      const FlowBackButton(),
+                      const SizedBox(height: 24),
 
-                    if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
-                      const M4LifeLogo(fontSize: 20, showTagline: true),
-                      const SizedBox(height: 32),
-                    ],
+                      if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
+                        const M4LifeLogo(fontSize: 20, showTagline: true),
+                        const SizedBox(height: 32),
+                      ],
 
-                    // Linha dourada divisora
+                      // Linha dourada divisora
                     Container(
                       width: 40,
                       height: 2,
@@ -1088,7 +1186,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       icon: Icons.cake_outlined,
                       tipo: TextInputType.number,
                       erro: _t('e_birth'),
-                      inputFormatters: [_DateInputFormatter()],
+                      inputFormatters: [DateInputFormatter()],
+                      minLength: 10,
+                      lengthErro: _t('e_birth_fmt'),
                     ),
 
                     const SizedBox(height: 14),
@@ -1116,7 +1216,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _continuar,
+                        onPressed: _submitting ? null : _continuar,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.gold,
                           foregroundColor: AppColors.black,
@@ -1124,12 +1224,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                               borderRadius: BorderRadius.circular(6)),
                           elevation: 0,
                         ),
-                        child: Text(_t('btn'),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                            )),
+                        child: _submitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.black,
+                                ),
+                              )
+                            : Text(_t('btn'),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1.5,
+                                )),
                       ),
                     ),
 
@@ -1141,6 +1250,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -1153,6 +1263,8 @@ class _Campo extends StatelessWidget {
   final TextInputType tipo;
   final String erro;
   final List<TextInputFormatter>? inputFormatters;
+  final int? minLength;
+  final String? lengthErro;
 
   const _Campo({
     required this.ctrl,
@@ -1162,6 +1274,8 @@ class _Campo extends StatelessWidget {
     required this.tipo,
     required this.erro,
     this.inputFormatters,
+    this.minLength,
+    this.lengthErro,
   });
 
   @override
@@ -1182,8 +1296,13 @@ class _Campo extends StatelessWidget {
           inputFormatters: inputFormatters,
           style: const TextStyle(
               color: AppColors.whiteWarm, fontSize: 15),
-          validator: (v) =>
-              v == null || v.trim().isEmpty ? erro : null,
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return erro;
+            if (minLength != null && v.trim().length < minLength!) {
+              return lengthErro ?? erro;
+            }
+            return null;
+          },
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(

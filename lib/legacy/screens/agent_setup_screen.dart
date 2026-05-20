@@ -6,8 +6,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/firestore_paths.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
+import 'package:hitlook/legacy/widgets/flow_ux.dart';
 
 class AgentSetupScreen extends StatefulWidget {
   const AgentSetupScreen({super.key});
@@ -267,7 +269,9 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 16),
+                        FlowBackButton(onPressed: () => context.go('/dashboard')),
+                        const SizedBox(height: 24),
 
                         const M4LifeLogo(fontSize: 18, showTagline: false),
 

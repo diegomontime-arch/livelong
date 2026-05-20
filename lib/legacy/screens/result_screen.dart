@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/chat_screen.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
+import 'package:hitlook/legacy/widgets/flow_ux.dart';
 import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
 
 class ResultScreen extends StatefulWidget {
@@ -40,6 +41,8 @@ class _ResultScreenState extends State<ResultScreen>
   int _anos = 10;
   bool _temDivida = false;
   double _divida = 0;
+  bool _whatsAppLoading = false;
+  bool _chatLoading = false;
 
   int get _score {
     int s = 0;
@@ -224,8 +227,10 @@ class _ResultScreenState extends State<ResultScreen>
     super.dispose();
   }
 
-  void _abrirChat() {
-    Navigator.push(
+  Future<void> _abrirChat() async {
+    if (_chatLoading) return;
+    setState(() => _chatLoading = true);
+    await Navigator.push(
       context,
       PageRouteBuilder(
         pageBuilder: (_, __, ___) => ChatScreen(
@@ -245,15 +250,18 @@ class _ResultScreenState extends State<ResultScreen>
         transitionDuration: const Duration(milliseconds: 400),
       ),
     );
+    if (mounted) setState(() => _chatLoading = false);
   }
 
   Future<void> _abrirWhatsApp() async {
+    if (_whatsAppLoading) return;
     final agentId = widget.agentId;
     if (agentId.isEmpty || agentId == 'default') {
       _mostrarErroWhatsApp();
       return;
     }
 
+    setState(() => _whatsAppLoading = true);
     try {
       final agent = await AgentProvider.loadAgent(agentId);
       final rawWhatsapp = agent.whatsapp.trim();
@@ -276,6 +284,8 @@ class _ResultScreenState extends State<ResultScreen>
       html.window.open(url, '_blank');
     } catch (_) {
       _mostrarErroWhatsApp();
+    } finally {
+      if (mounted) setState(() => _whatsAppLoading = false);
     }
   }
 
@@ -328,20 +338,24 @@ class _ResultScreenState extends State<ResultScreen>
   Widget build(BuildContext context) {
     final plano = _plano;
 
-    return PublicLeadFlowScaffold(
+    return FlowExitGuard(
       lang: widget.lang,
-      child: WatermarkBackground(
-        child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeIn,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 28),
+      child: PublicLeadFlowScaffold(
+        lang: widget.lang,
+        child: WatermarkBackground(
+          child: SafeArea(
+            child: FadeTransition(
+              opacity: _fadeIn,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 12),
+                    const FlowBackButton(),
+                    const SizedBox(height: 16),
 
-                  const M4LifeLogo(fontSize: 18, showTagline: false),
+                    const M4LifeLogo(fontSize: 18, showTagline: false),
 
                   const SizedBox(height: 24),
 
@@ -555,6 +569,10 @@ class _ResultScreenState extends State<ResultScreen>
 
                   const SizedBox(height: 24),
 
+                  _LivingBenefitCards(lang: widget.lang),
+
+                  const SizedBox(height: 24),
+
                   // ── CALCULADORA ────────────────
                   Row(
                     children: [
@@ -699,17 +717,12 @@ class _ResultScreenState extends State<ResultScreen>
 
                   const SizedBox(height: 24),
 
-                  // ── BENEFÍCIO EM VIDA ──────────
-                  _LivingBenefitCards(lang: widget.lang),
-
-                  const SizedBox(height: 24),
-
                   // ── BOTÃO FALAR COM ANA ────────
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: _abrirChat,
+                      onPressed: _chatLoading ? null : _abrirChat,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.gold,
                         foregroundColor: AppColors.black,
@@ -717,18 +730,28 @@ class _ResultScreenState extends State<ResultScreen>
                             borderRadius: BorderRadius.circular(8)),
                         elevation: 0,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(_t('talk_ana'),
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5)),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.chat_bubble_outline, size: 16),
-                        ],
-                      ),
+                      child: _chatLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.black,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(_t('talk_ana'),
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 0.5)),
+                                const SizedBox(width: 8),
+                                const Icon(Icons.chat_bubble_outline,
+                                    size: 16),
+                              ],
+                            ),
                     ),
                   ),
 
@@ -739,7 +762,8 @@ class _ResultScreenState extends State<ResultScreen>
                     width: double.infinity,
                     height: 54,
                     child: OutlinedButton(
-                      onPressed: _abrirWhatsApp,
+                      onPressed:
+                          _whatsAppLoading ? null : _abrirWhatsApp,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.white,
                         side: BorderSide(
@@ -747,19 +771,28 @@ class _ResultScreenState extends State<ResultScreen>
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8)),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.phone_outlined,
-                              size: 16, color: AppColors.gold),
-                          const SizedBox(width: 8),
-                          Text(_t('talk_agent'),
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.white)),
-                        ],
-                      ),
+                      child: _whatsAppLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.gold,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.phone_outlined,
+                                    size: 16, color: AppColors.gold),
+                                const SizedBox(width: 8),
+                                Text(_t('talk_agent'),
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.white)),
+                              ],
+                            ),
                     ),
                   ),
 
@@ -796,6 +829,7 @@ class _ResultScreenState extends State<ResultScreen>
           ),
         ),
       ),
+    ),
     );
   }
 }
