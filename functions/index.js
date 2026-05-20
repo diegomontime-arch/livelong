@@ -1,4 +1,6 @@
 const functions = require("firebase-functions");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const https = require("https");
 
@@ -23,7 +25,7 @@ exports.anthropicProxy = functions.https.onRequest((req, res) => {
     return;
   }
 
-  const apiKey = functions.config().anthropic.key;
+  const apiKey = functions.config().anthropic?.key;
   const body = JSON.stringify(req.body);
 
   const options = {
@@ -57,55 +59,57 @@ exports.anthropicProxy = functions.https.onRequest((req, res) => {
 const LANG_LABEL = { pt: "Português", es: "Español", en: "English" };
 
 /**
- * Queues an email via the Firestore "Trigger Email" extension (`mail` collection).
- * Install: Firebase Console → Extensions → Trigger Email from Firestore.
+ * Queues email via Firebase Extension "Trigger Email from Firestore" (`mail`).
  */
-exports.notifyAgentOnNewLead = functions.firestore
-  .document("leads/{leadId}")
-  .onCreate(async (snap) => {
-    const lead = snap.data();
-    const agentId = lead.agentId;
-    if (!agentId) {
-      functions.logger.warn("Lead without agentId", snap.id);
-      return null;
-    }
+exports.notifyAgentOnNewLead = onDocumentCreated(
+  { document: "leads/{leadId}", region: "us-central1" },
+  async (event) => {
+  const snap = event.data;
+  if (!snap) return;
 
-    const email = await resolveAgentEmail(agentId);
-    if (!email) {
-      functions.logger.warn("No email for agent", agentId);
-      return null;
-    }
+  const lead = snap.data();
+  const agentId = lead.agentId;
+  if (!agentId) {
+    logger.warn("Lead without agentId", event.params.leadId);
+    return;
+  }
 
-    const nome = lead.nome || "Prospect";
-    const telefone = lead.telefone || "—";
-    const score = lead.score != null ? `${lead.score}%` : "—";
-    const lang = LANG_LABEL[lead.lang] || lead.lang || "—";
+  const email = await resolveAgentEmail(agentId);
+  if (!email) {
+    logger.warn("No email for agent", agentId);
+    return;
+  }
 
-    const subject = `Novo lead HitLook: ${nome}`;
-    const text =
-      `Você recebeu um novo lead no HitLook.\n\n` +
-      `Nome: ${nome}\n` +
-      `Telefone: ${telefone}\n` +
-      `Score: ${score}\n` +
-      `Idioma: ${lang}\n\n` +
-      `Acesse seu painel: https://hitlook-app.web.app/dashboard`;
+  const nome = lead.nome || "Prospect";
+  const telefone = lead.telefone || "—";
+  const score = lead.score != null ? `${lead.score}%` : "—";
+  const lang = LANG_LABEL[lead.lang] || lead.lang || "—";
 
-    const html =
-      `<h2>Novo lead HitLook</h2>` +
-      `<p><strong>Nome:</strong> ${escapeHtml(nome)}</p>` +
-      `<p><strong>Telefone:</strong> ${escapeHtml(telefone)}</p>` +
-      `<p><strong>Score:</strong> ${escapeHtml(String(score))}</p>` +
-      `<p><strong>Idioma:</strong> ${escapeHtml(lang)}</p>` +
-      `<p><a href="https://hitlook-app.web.app/dashboard">Abrir painel</a></p>`;
+  const subject = `Novo lead HitLook: ${nome}`;
+  const text =
+    `Você recebeu um novo lead no HitLook.\n\n` +
+    `Nome: ${nome}\n` +
+    `Telefone: ${telefone}\n` +
+    `Score: ${score}\n` +
+    `Idioma: ${lang}\n\n` +
+    `Acesse seu painel: https://hitlook-app.web.app/dashboard`;
 
-    await db.collection("mail").add({
-      to: email,
-      message: { subject, text, html },
-    });
+  const html =
+    `<h2>Novo lead HitLook</h2>` +
+    `<p><strong>Nome:</strong> ${escapeHtml(nome)}</p>` +
+    `<p><strong>Telefone:</strong> ${escapeHtml(telefone)}</p>` +
+    `<p><strong>Score:</strong> ${escapeHtml(String(score))}</p>` +
+    `<p><strong>Idioma:</strong> ${escapeHtml(lang)}</p>` +
+    `<p><a href="https://hitlook-app.web.app/dashboard">Abrir painel</a></p>`;
 
-    functions.logger.info("Queued lead email", { leadId: snap.id, to: email });
-    return null;
+  await db.collection("mail").add({
+    to: email,
+    message: { subject, text, html },
   });
+
+  logger.info("Queued lead email", { leadId: event.params.leadId, to: email });
+  },
+);
 
 async function resolveAgentEmail(agentId) {
   const userDoc = await db.collection("users").doc(agentId).get();
