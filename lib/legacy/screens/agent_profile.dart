@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 // ─── MODELO DO AGENTE ────────────────────────────────────
@@ -11,6 +12,7 @@ class AgentProfile {
   final String fotoUrl;
   final String idioma;
   final String nicho;
+  final String? userId;
 
   const AgentProfile({
     required this.id,
@@ -20,21 +22,39 @@ class AgentProfile {
     required this.fotoUrl,
     required this.idioma,
     required this.nicho,
+    this.userId,
   });
 
   factory AgentProfile.fromMap(String id, Map<String, dynamic> map) {
     return AgentProfile(
       id: id,
-      nome: map['nome'] ?? '',
-      bio: map['bio'] ?? '',
-      whatsapp: map['whatsapp'] ?? '',
-      fotoUrl: map['fotoUrl'] ?? '',
-      idioma: map['idioma'] ?? 'pt',
-      nicho: map['nicho'] ?? 'seguro',
+      nome: map['nome'] as String? ?? map['displayName'] as String? ?? '',
+      bio: map['bio'] as String? ?? '',
+      whatsapp: map['whatsapp'] as String? ??
+          map['phone'] as String? ??
+          '',
+      fotoUrl: map['fotoUrl'] as String? ?? map['photoUrl'] as String? ?? '',
+      idioma: map['idioma'] as String? ?? 'pt',
+      nicho: map['nicho'] as String? ?? 'seguro',
+      userId: map['userId'] as String?,
     );
   }
 
-  // Perfil padrão quando não tem agente configurado
+  factory AgentProfile.fromSeller(String slug, Map<String, dynamic> seller) {
+    return AgentProfile(
+      id: slug,
+      nome: seller['displayName'] as String? ?? '',
+      bio: seller['bio'] as String? ?? '',
+      whatsapp: seller['phone'] as String? ??
+          seller['whatsapp'] as String? ??
+          '',
+      fotoUrl: seller['photoUrl'] as String? ?? '',
+      idioma: 'pt',
+      nicho: 'seguro',
+      userId: seller['userId'] as String?,
+    );
+  }
+
   static const AgentProfile defaultProfile = AgentProfile(
     id: 'default',
     nome: 'M4LIFE USA',
@@ -48,26 +68,76 @@ class AgentProfile {
 
 // ─── PROVIDER DO AGENTE ──────────────────────────────────
 class AgentProvider {
+  static final _db = FirebaseFirestore.instance;
+
+  /// Firebase Auth UIDs are typically 28 characters.
+  static bool looksLikeFirebaseUid(String id) =>
+      id.length >= 20 && RegExp(r'^[A-Za-z0-9]+$').hasMatch(id);
+
+  /// Resolves public link id (slug or UID) to the owner's Auth UID for leads.
+  static Future<String> resolveOwnerUid(String agentId) async {
+    if (agentId.isEmpty || agentId == 'default') return agentId;
+    if (looksLikeFirebaseUid(agentId)) return agentId;
+
+    final profile = await loadAgent(agentId);
+    if (profile.userId != null && profile.userId!.isNotEmpty) {
+      return profile.userId!;
+    }
+    if (looksLikeFirebaseUid(profile.id)) return profile.id;
+
+    final slugDoc = await _db.collection('seller_slugs').doc(agentId).get();
+    if (slugDoc.exists) {
+      final seller = await _loadSellerFromSlugData(slugDoc.data() ?? {});
+      if (seller?.userId != null && seller!.userId!.isNotEmpty) {
+        return seller.userId!;
+      }
+    }
+
+    final agentsDoc = await _db.collection('agents').doc(agentId).get();
+    final uid = agentsDoc.data()?['userId'] as String?;
+    if (uid != null && uid.isNotEmpty) return uid;
+
+    return agentId;
+  }
+
   /// Loads the public seller profile for [agentId] (Firebase UID or public slug).
-  ///
-  /// Profile data may live in legacy `agents/{uid}` and/or SaaS
-  /// `seller_slugs` + `companies/.../sellers`. When the link uses a slug,
-  /// we merge the SaaS seller with `agents/{userId}` so the photo saved in
-  /// "Meu perfil" still appears.
   static Future<AgentProfile> loadAgent(String agentId) async {
     if (agentId.isEmpty || agentId == 'default') {
       return AgentProfile.defaultProfile;
     }
 
     try {
-      final direct = await _loadAgentsDoc(agentId);
-      if (direct != null && _isConfigured(direct)) return direct;
+      final profiles = <AgentProfile>[];
 
       final viaSlug = await _loadViaSellerSlug(agentId);
-      if (viaSlug != null) return viaSlug;
+      if (viaSlug != null) profiles.add(viaSlug);
 
-      return direct ?? AgentProfile.defaultProfile;
-    } catch (e) {
+      if (looksLikeFirebaseUid(agentId)) {
+        final viaUser = await _loadViaUserId(agentId);
+        if (viaUser != null) profiles.add(viaUser);
+      }
+
+      final direct = await _loadAgentsDoc(agentId);
+      if (direct != null) profiles.add(direct);
+
+      var merged = _mergeAll(profiles);
+      if (_isConfigured(merged)) return merged;
+
+      // Slug mirror: agents/{slug} when URL used UID but profile lives under slug doc.
+      if (looksLikeFirebaseUid(agentId) && merged.userId != null) {
+        final userSnap = await _db.collection('users').doc(agentId).get();
+        final sellerId = userSnap.data()?['sellerId'] as String?;
+        if (sellerId != null && sellerId.isNotEmpty) {
+          final slugAgent = await _loadAgentsDoc(sellerId);
+          if (slugAgent != null) {
+            merged = _merge(merged, slugAgent);
+            if (_isConfigured(merged)) return merged;
+          }
+        }
+      }
+
+      return merged.nome.isNotEmpty ? merged : AgentProfile.defaultProfile;
+    } catch (_) {
       return AgentProfile.defaultProfile;
     }
   }
@@ -78,67 +148,118 @@ class AgentProvider {
   }
 
   static Future<AgentProfile?> _loadAgentsDoc(String id) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('agents')
-        .doc(id)
-        .get();
+    final doc = await _db.collection('agents').doc(id).get();
     if (!doc.exists || doc.data() == null) return null;
     return AgentProfile.fromMap(id, doc.data()!);
   }
 
-  static Future<AgentProfile?> _loadViaSellerSlug(String slug) async {
-    final slugDoc = await FirebaseFirestore.instance
-        .collection('seller_slugs')
-        .doc(slug)
-        .get();
-    if (!slugDoc.exists || slugDoc.data() == null) return null;
+  static Future<AgentProfile?> _loadViaUserId(String uid) async {
+    final userDoc = await _db.collection('users').doc(uid).get();
+    if (!userDoc.exists || userDoc.data() == null) return null;
 
-    final slugData = slugDoc.data()!;
+    final data = userDoc.data()!;
+    final companyId = data['companyId'] as String?;
+    final sellerId = data['sellerId'] as String?;
+    if (companyId == null || sellerId == null) {
+      return await _loadAgentsDoc(uid);
+    }
+
+    final sellerDoc = await _db
+        .collection('companies')
+        .doc(companyId)
+        .collection('sellers')
+        .doc(sellerId)
+        .get();
+    if (!sellerDoc.exists || sellerDoc.data() == null) {
+      return await _loadAgentsDoc(uid);
+    }
+
+    var profile = AgentProfile.fromSeller(
+      sellerDoc.data()?['slug'] as String? ?? sellerId,
+      sellerDoc.data()!,
+    );
+
+    final legacy = await _loadAgentsDoc(uid);
+    if (legacy != null) profile = _merge(profile, legacy);
+
+    final slug = sellerDoc.data()?['slug'] as String?;
+    if (slug != null && slug.isNotEmpty && slug != uid) {
+      final slugMirror = await _loadAgentsDoc(slug);
+      if (slugMirror != null) profile = _merge(profile, slugMirror);
+    }
+
+    return profile;
+  }
+
+  static Future<AgentProfile?> _loadSellerFromSlugData(
+    Map<String, dynamic> slugData,
+  ) async {
     final companyId = slugData['companyId'] as String?;
     final sellerId = slugData['sellerId'] as String?;
     if (companyId == null || sellerId == null) return null;
 
-    final sellerDoc = await FirebaseFirestore.instance
+    final sellerDoc = await _db
         .collection('companies')
         .doc(companyId)
         .collection('sellers')
         .doc(sellerId)
         .get();
     if (!sellerDoc.exists || sellerDoc.data() == null) return null;
-
-    final seller = sellerDoc.data()!;
-    var profile = AgentProfile(
-      id: slug,
-      nome: seller['displayName'] as String? ?? '',
-      bio: seller['bio'] as String? ?? '',
-      whatsapp: seller['phone'] as String? ??
-          seller['whatsapp'] as String? ??
-          '',
-      fotoUrl: seller['photoUrl'] as String? ?? '',
-      idioma: 'pt',
-      nicho: 'seguro',
-    );
-
-    final linkedUid = seller['userId'] as String?;
-    if (linkedUid != null && linkedUid.isNotEmpty) {
-      final legacy = await _loadAgentsDoc(linkedUid);
-      if (legacy != null) profile = _merge(profile, legacy);
-    }
-
-    return profile;
+    return AgentProfile.fromSeller(sellerId, sellerDoc.data()!);
   }
 
-  /// Prefer SaaS display fields; fill photo/name from legacy when missing.
+  static Future<AgentProfile?> _loadViaSellerSlug(String slug) async {
+    final slugDoc = await _db.collection('seller_slugs').doc(slug).get();
+    if (!slugDoc.exists || slugDoc.data() == null) return null;
+
+    final profile = await _loadSellerFromSlugData(slugDoc.data()!);
+    if (profile == null) return null;
+
+    var merged = AgentProfile(
+      id: slug,
+      nome: profile.nome,
+      bio: profile.bio,
+      whatsapp: profile.whatsapp,
+      fotoUrl: profile.fotoUrl,
+      idioma: profile.idioma,
+      nicho: profile.nicho,
+      userId: profile.userId,
+    );
+
+    final slugMirror = await _loadAgentsDoc(slug);
+    if (slugMirror != null) merged = _merge(merged, slugMirror);
+
+    final linkedUid = profile.userId;
+    if (linkedUid != null && linkedUid.isNotEmpty) {
+      final legacy = await _loadAgentsDoc(linkedUid);
+      if (legacy != null) merged = _merge(merged, legacy);
+    }
+
+    return merged;
+  }
+
   static AgentProfile _merge(AgentProfile primary, AgentProfile legacy) {
     return AgentProfile(
       id: primary.id,
       nome: primary.nome.isNotEmpty ? primary.nome : legacy.nome,
       bio: primary.bio.isNotEmpty ? primary.bio : legacy.bio,
-      whatsapp: primary.whatsapp.isNotEmpty ? primary.whatsapp : legacy.whatsapp,
-      fotoUrl: primary.fotoUrl.isNotEmpty ? primary.fotoUrl : legacy.fotoUrl,
+      whatsapp:
+          primary.whatsapp.isNotEmpty ? primary.whatsapp : legacy.whatsapp,
+      fotoUrl:
+          primary.fotoUrl.isNotEmpty ? primary.fotoUrl : legacy.fotoUrl,
       idioma: primary.idioma,
       nicho: primary.nicho,
+      userId: primary.userId ?? legacy.userId,
     );
+  }
+
+  static AgentProfile _mergeAll(List<AgentProfile> profiles) {
+    if (profiles.isEmpty) return AgentProfile.defaultProfile;
+    var result = profiles.first;
+    for (var i = 1; i < profiles.length; i++) {
+      result = _merge(result, profiles[i]);
+    }
+    return result;
   }
 }
 
@@ -159,7 +280,6 @@ class AgentCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Foto do agente
           Container(
             width: 56,
             height: 56,
@@ -176,15 +296,14 @@ class AgentCard extends StatelessWidget {
                     child: Image.network(
                       agent.fotoUrl,
                       fit: BoxFit.cover,
+                      width: 56,
+                      height: 56,
                       errorBuilder: (_, __, ___) => _initials(),
                     ),
                   )
                 : _initials(),
           ),
-
           const SizedBox(width: 14),
-
-          // Info do agente
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,13 +330,13 @@ class AgentCard extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(width: 10),
-
-          // Botão WhatsApp
           if (agent.whatsapp.isNotEmpty)
             GestureDetector(
-              onTap: () => _abrirWhatsApp(agent.whatsapp),
+              onTap: () => openWhatsApp(
+                phone: agent.whatsapp,
+                message: 'Olá!',
+              ),
               child: Container(
                 width: 36,
                 height: 36,
@@ -254,11 +373,5 @@ class AgentCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  void _abrirWhatsApp(String numero) {
-    // Abre WhatsApp com o número do agente
-    final url = 'https://wa.me/$numero';
-    // Implementar url_launcher futuramente
   }
 }

@@ -139,8 +139,9 @@ class _ResultScreenState extends State<ResultScreen>
 
   Future<void> _saveLead() async {
     try {
+      final ownerUid = await AgentProvider.resolveOwnerUid(widget.agentId);
       await FirebaseFirestore.instance.collection('leads').add({
-        'agentId': widget.agentId,
+        'agentId': ownerUid,
         'nome': widget.nome,
         'telefone': widget.telefone,
         'nascimento': widget.nascimento,
