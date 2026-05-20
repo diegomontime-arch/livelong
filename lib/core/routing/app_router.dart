@@ -29,7 +29,13 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: RoutePaths.login,
-      builder: (context, state) => const AgentLoginScreen(),
+      builder: (context, state) {
+        final qp = state.uri.queryParameters;
+        return AgentLoginScreen(
+          passwordResetOobCode:
+              qp['mode'] == 'resetPassword' ? qp['oobCode'] : null,
+        );
+      },
     ),
     GoRoute(
       path: RoutePaths.dashboard,

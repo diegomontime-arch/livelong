@@ -7,6 +7,18 @@ import 'package:hitlook/legacy/admin/admin_session.dart';
 
 /// Auth and role-based redirects for [GoRouter].
 Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
+  final qp = state.uri.queryParameters;
+  final oobCode = qp['oobCode'];
+  final mode = qp['mode'];
+
+  // Password-reset links must land on /login (not / or other routes).
+  if (mode == 'resetPassword' &&
+      oobCode != null &&
+      oobCode.isNotEmpty &&
+      state.uri.path != RoutePaths.login) {
+    return '${RoutePaths.login}?mode=resetPassword&oobCode=${Uri.encodeComponent(oobCode)}';
+  }
+
   final isLoggedIn = FirebaseAuth.instance.currentUser != null;
   final path = state.uri.path;
 

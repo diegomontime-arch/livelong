@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:hitlook/core/constants/firestore_paths.dart';
 import 'package:hitlook/core/constants/route_paths.dart';
@@ -23,10 +24,14 @@ class AdminSession {
 
   bool get isAdmin => role == UserRole.admin;
 
-  /// Route after successful login.
+  /// Route after successful login. Never throws — sellers without `users/{uid}` go to dashboard.
   static Future<String> postLoginRoute() async {
-    final session = await load();
-    if (session?.isAdmin == true) return RoutePaths.admin;
+    try {
+      final session = await load();
+      if (session?.isAdmin == true) return RoutePaths.admin;
+    } catch (e, st) {
+      debugPrint('[HitLook:AdminSession] postLoginRoute load failed: $e\n$st');
+    }
     return RoutePaths.dashboard;
   }
 

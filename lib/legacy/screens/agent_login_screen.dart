@@ -1,11 +1,16 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/legacy/admin/admin_session.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 class AgentLoginScreen extends StatefulWidget {
-  const AgentLoginScreen({super.key});
+  const AgentLoginScreen({super.key, this.passwordResetOobCode});
+
+  /// From `/login?mode=resetPassword&oobCode=...` (email link).
+  final String? passwordResetOobCode;
 
   @override
   State<AgentLoginScreen> createState() => _AgentLoginScreenState();
@@ -39,7 +44,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
   @override
   void initState() {
     super.initState();
-    _verificarLinkRedefinicaoSenha();
+    _iniciarFluxoRedefinicaoSenha();
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -60,15 +65,24 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     super.dispose();
   }
 
-  /// Link do e-mail: /login?mode=resetPassword&oobCode=...
-  void _verificarLinkRedefinicaoSenha() {
-    final params = Uri.base.queryParameters;
-    final mode = params['mode'];
-    final code = params['oobCode'];
-    if (mode == 'resetPassword' && code != null && code.isNotEmpty) {
+  void _iniciarFluxoRedefinicaoSenha() {
+    final code = widget.passwordResetOobCode;
+    if (code != null && code.isNotEmpty) {
       _oobCode = code;
       _definirNovaSenha = true;
+      debugPrint('[HitLook:auth] password reset link opened (oobCode present)');
     }
+  }
+
+  Future<void> _irParaLoginLimpo({String? mensagemSucesso}) async {
+    if (!mounted) return;
+    setState(() {
+      _definirNovaSenha = false;
+      _oobCode = null;
+      _confirmResetLoading = false;
+      if (mensagemSucesso != null) _sucesso = mensagemSucesso;
+    });
+    context.go(RoutePaths.login);
   }
 
   Future<void> _confirmarNovaSenha() async {
@@ -88,28 +102,55 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
       _sucesso = null;
     });
 
+    final newPassword = _novaSenhaCtrl.text;
+
     try {
-      await FirebaseAuth.instance.verifyPasswordResetCode(code);
+      debugPrint('[HitLook:auth] verifyPasswordResetCode…');
+      final email = await FirebaseAuth.instance.verifyPasswordResetCode(code);
+      debugPrint('[HitLook:auth] confirmPasswordReset for $email');
+
       await FirebaseAuth.instance.confirmPasswordReset(
         code: code,
-        newPassword: _novaSenhaCtrl.text,
+        newPassword: newPassword,
+      );
+
+      _novaSenhaCtrl.clear();
+      _confirmarSenhaCtrl.clear();
+
+      // Entrar automaticamente com a senha recém-definida (evita erro de digitação).
+      debugPrint('[HitLook:auth] signIn after reset for $email');
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: newPassword,
       );
 
       if (!mounted) return;
-      setState(() {
-        _definirNovaSenha = false;
-        _oobCode = null;
-        _novaSenhaCtrl.clear();
-        _confirmarSenhaCtrl.clear();
-        _sucesso =
-            'Senha alterada com sucesso! Use a nova senha abaixo para entrar.';
-      });
-      context.go('/login');
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _erro = _traduzirErroConfirmReset(e.code);
-      });
-    } catch (_) {
+      final route = await AdminSession.postLoginRoute();
+      debugPrint('[HitLook:auth] reset+login OK → $route');
+      context.go(route);
+    } on FirebaseAuthException catch (e, st) {
+      debugPrint(
+        '[HitLook:auth] reset/sign-in failed: ${e.code} ${e.message}\n$st',
+      );
+      if (e.code == 'invalid-credential' ||
+          e.code == 'wrong-password' ||
+          e.code == 'user-not-found') {
+        await _irParaLoginLimpo(
+          mensagemSucesso:
+              'Senha alterada. Faça login com o e-mail do link e a nova senha.',
+        );
+        if (mounted) {
+          setState(() {
+            _erro = null;
+          });
+        }
+      } else {
+        setState(() {
+          _erro = _traduzirErroConfirmReset(e.code);
+        });
+      }
+    } catch (e, st) {
+      debugPrint('[HitLook:auth] reset unexpected: $e\n$st');
       setState(() {
         _erro = 'Não foi possível alterar a senha. Solicite um novo link.';
       });
@@ -179,9 +220,11 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
       _sucesso = null;
     });
 
+    final email = _emailCtrl.text.trim().toLowerCase();
+    final password = _senhaCtrl.text;
+
     try {
-      final email = _emailCtrl.text.trim().toLowerCase();
-      final password = _senhaCtrl.text;
+      debugPrint('[HitLook:auth] ${_isCadastro ? "signUp" : "signIn"} $email');
 
       if (_isCadastro) {
         await FirebaseAuth.instance.createUserWithEmailAndPassword(
@@ -195,21 +238,27 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
         );
       }
 
-      if (mounted) {
-        final route = await AdminSession.postLoginRoute();
-        context.go(route);
-      }
-    } on FirebaseAuthException catch (e) {
+      debugPrint('[HitLook:auth] Firebase Auth OK uid=${FirebaseAuth.instance.currentUser?.uid}');
+
+      if (!mounted) return;
+      final route = await AdminSession.postLoginRoute();
+      debugPrint('[HitLook:auth] navigating → $route');
+      context.go(route);
+    } on FirebaseAuthException catch (e, st) {
+      debugPrint('[HitLook:auth] FirebaseAuthException: ${e.code} ${e.message}\n$st');
       setState(() {
         _erro = _traduzirErro(e.code);
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[HitLook:auth] login unexpected: $e\n$st');
       setState(() {
-        _erro = 'Erro inesperado. Tente novamente.';
+        _erro = kDebugMode
+            ? 'Erro: $e'
+            : 'Erro inesperado. Tente novamente.';
       });
     }
 
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   String _traduzirErro(String code) {
