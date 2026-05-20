@@ -247,30 +247,6 @@ class _ResultScreenState extends State<ResultScreen>
     );
   }
 
-  void _abrirLivingBenefit() {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (_, __, ___) => LivingBenefitScreen(
-          lang: widget.lang,
-          onContinue: () {
-            Navigator.pop(context);
-            _abrirWhatsApp();
-          },
-        ),
-        transitionsBuilder: (_, anim, __, child) =>
-            SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 1),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
-              child: child,
-            ),
-        transitionDuration: const Duration(milliseconds: 400),
-      ),
-    );
-  }
-
   Future<void> _abrirWhatsApp() async {
     final agentId = widget.agentId;
     if (agentId.isEmpty || agentId == 'default') {
@@ -579,6 +555,11 @@ class _ResultScreenState extends State<ResultScreen>
 
                   const SizedBox(height: 24),
 
+                  // ── BENEFÍCIO EM VIDA ──────────
+                  _LivingBenefitCards(lang: widget.lang),
+
+                  const SizedBox(height: 24),
+
                   // ── CALCULADORA ────────────────
                   Row(
                     children: [
@@ -758,7 +739,7 @@ class _ResultScreenState extends State<ResultScreen>
                     width: double.infinity,
                     height: 54,
                     child: OutlinedButton(
-                      onPressed: _abrirLivingBenefit,
+                      onPressed: _abrirWhatsApp,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.white,
                         side: BorderSide(
@@ -906,6 +887,293 @@ class _SliderItem extends StatelessWidget {
             max: max,
             divisions: divisions,
             onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── LIVING BENEFIT CARDS ─────────────────────────────────
+class _LivingBenefitCards extends StatefulWidget {
+  final String lang;
+  const _LivingBenefitCards({required this.lang});
+
+  @override
+  State<_LivingBenefitCards> createState() => _LivingBenefitCardsState();
+}
+
+class _LivingBenefitCardsState extends State<_LivingBenefitCards> {
+  int _current = 0;
+
+  final _cards = [
+    {
+      'pt': {
+        'icon': '🏥',
+        'title': 'Você sabia disso?',
+        'desc': 'Se você for diagnosticado com uma doença grave como câncer ou infarto, seu seguro pode pagar AGORA — sem você precisar morrer.',
+        'highlight': 'Isso se chama Benefício em Vida.',
+      },
+      'es': {
+        'icon': '🏥',
+        'title': '¿Sabías esto?',
+        'desc': 'Si te diagnostican una enfermedad grave como cáncer o infarto, tu seguro puede pagar AHORA — sin que tengas que morir.',
+        'highlight': 'Esto se llama Beneficio en Vida.',
+      },
+      'en': {
+        'icon': '🏥',
+        'title': 'Did you know this?',
+        'desc': 'If you are diagnosed with a serious illness like cancer or heart attack, your insurance can pay NOW — without you having to die.',
+        'highlight': 'This is called a Living Benefit.',
+      },
+    },
+    {
+      'pt': {
+        'icon': '👨‍👩‍👧',
+        'title': 'Proteção para você E sua família',
+        'desc': 'Seguro moderno não é só para quando você morre. É para pagar suas contas e manter sua família enquanto você se recupera.',
+        'highlight': 'Você usa o seguro ainda em vida.',
+      },
+      'es': {
+        'icon': '👨‍👩‍👧',
+        'title': 'Protección para ti Y tu familia',
+        'desc': 'El seguro moderno no es solo para cuando mueres. Es para pagar tus cuentas y mantener a tu familia mientras te recuperas.',
+        'highlight': 'Usas el seguro aún en vida.',
+      },
+      'en': {
+        'icon': '👨‍👩‍👧',
+        'title': 'Protection for you AND your family',
+        'desc': 'Modern insurance is not just for when you die. It pays your bills and supports your family while you recover.',
+        'highlight': 'You use the insurance while still alive.',
+      },
+    },
+    {
+      'pt': {
+        'icon': '💬',
+        'title': 'Pergunte ao seu consultor',
+        'desc': 'Nem todos os planos têm esse benefício. Mas existem opções acessíveis que incluem cobertura em vida. Seu consultor pode mostrar as opções.',
+        'highlight': 'Clique abaixo e pergunte sobre o Benefício em Vida.',
+      },
+      'es': {
+        'icon': '💬',
+        'title': 'Pregúntale a tu consultor',
+        'desc': 'No todos los planes tienen este beneficio. Pero hay opciones accesibles que incluyen cobertura en vida. Tu consultor puede mostrarte las opciones.',
+        'highlight': 'Haz clic abajo y pregunta sobre el Beneficio en Vida.',
+      },
+      'en': {
+        'icon': '💬',
+        'title': 'Ask your consultant',
+        'desc': 'Not all plans have this benefit. But there are affordable options that include living coverage. Your consultant can show you the options.',
+        'highlight': 'Click below and ask about the Living Benefit.',
+      },
+    },
+  ];
+
+  String _t(Map card, String key) =>
+      (card[widget.lang] ?? card['pt'])[key] ?? '';
+
+  String _next() {
+    switch (widget.lang) {
+      case 'es': return 'Siguiente';
+      case 'en': return 'Next';
+      default: return 'Próximo';
+    }
+  }
+
+  String _understand() {
+    switch (widget.lang) {
+      case 'es': return 'Entendido';
+      case 'en': return 'Got it';
+      default: return 'Entendido';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final card = _cards[_current];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Label
+        Row(
+          children: [
+            Container(width: 3, height: 16, color: AppColors.gold),
+            const SizedBox(width: 8),
+            Text(
+              widget.lang == 'en'
+                  ? 'LIVING BENEFIT'
+                  : widget.lang == 'es'
+                      ? 'BENEFICIO EN VIDA'
+                      : 'BENEFÍCIO EM VIDA',
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.gold,
+                letterSpacing: 3,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+
+        // Card
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: Container(
+            key: ValueKey(_current),
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.blackCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.gold.withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      _t(card, 'icon'),
+                      style: const TextStyle(fontSize: 32),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _t(card, 'title'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 14),
+
+                Text(
+                  _t(card, 'desc'),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.greyLight,
+                    height: 1.6,
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.gold.withOpacity(0.25),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star,
+                          color: AppColors.gold, size: 14),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _t(card, 'highlight'),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.gold,
+                            fontWeight: FontWeight.w600,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Indicadores + botão
+                Row(
+                  children: [
+                    // Dots
+                    Row(
+                      children: List.generate(
+                        _cards.length,
+                        (i) => Container(
+                          margin: const EdgeInsets.only(right: 6),
+                          width: i == _current ? 20 : 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: i == _current
+                                ? AppColors.gold
+                                : AppColors.grey.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // Botão next/entendido
+                    GestureDetector(
+                      onTap: () {
+                        if (_current < _cards.length - 1) {
+                          setState(() => _current++);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: _current < _cards.length - 1
+                              ? AppColors.gold.withOpacity(0.1)
+                              : AppColors.gold,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.gold.withOpacity(0.4),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              _current < _cards.length - 1
+                                  ? _next()
+                                  : _understand(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _current < _cards.length - 1
+                                    ? AppColors.gold
+                                    : AppColors.black,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              _current < _cards.length - 1
+                                  ? Icons.arrow_forward
+                                  : Icons.check,
+                              size: 13,
+                              color: _current < _cards.length - 1
+                                  ? AppColors.gold
+                                  : AppColors.black,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ],
