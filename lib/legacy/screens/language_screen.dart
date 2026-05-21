@@ -143,50 +143,48 @@ class WatermarkBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Grid sutil
+        // Decorative layers must not steal taps (Safari iOS WebKit).
         Positioned.fill(
-          child: Opacity(
-            opacity: 0.015,
-            child: CustomPaint(painter: _GridPainter()),
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: 0.015,
+              child: CustomPaint(painter: _GridPainter()),
+            ),
           ),
         ),
-
-        // M4LIFE marca dagua
         Positioned(
           bottom: 80,
           left: 0,
           right: 0,
-          child: Center(
-            child: Opacity(
-              opacity: 0.022,
-              child: Text(
-                'M4LIFE',
-                style: TextStyle(
-                  fontSize: 72,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.gold,
-                  letterSpacing: 16,
+          child: IgnorePointer(
+            child: Center(
+              child: Opacity(
+                opacity: 0.022,
+                child: Text(
+                  'M4LIFE',
+                  style: TextStyle(
+                    fontSize: 72,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.gold,
+                    letterSpacing: 16,
+                  ),
                 ),
               ),
             ),
           ),
         ),
-
-        // Coruja canto inferior direito
         const Positioned(
           bottom: 18,
           right: 18,
-          child: OwlMark(size: 44, opacity: 0.09),
+          child: IgnorePointer(
+            child: OwlMark(size: 44, opacity: 0.09),
+          ),
         ),
-
-        // Indicador AI
         Positioned(
           top: 14,
           right: 14,
-          child: _AiIndicator(),
+          child: IgnorePointer(child: _AiIndicator()),
         ),
-
-        // Conteúdo
         child,
       ],
     );

@@ -17,11 +17,7 @@ class AgentLoginScreen extends StatefulWidget {
   State<AgentLoginScreen> createState() => _AgentLoginScreenState();
 }
 
-class _AgentLoginScreenState extends State<AgentLoginScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _fadeIn;
-
+class _AgentLoginScreenState extends State<AgentLoginScreen> {
   final _emailCtrl = TextEditingController();
   final _senhaCtrl = TextEditingController();
   final _novaSenhaCtrl = TextEditingController();
@@ -45,19 +41,10 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
   void initState() {
     super.initState();
     _iniciarFluxoRedefinicaoSenha();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _fadeIn = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeIn),
-    );
-    _ctrl.forward();
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
     _emailCtrl.dispose();
     _senhaCtrl.dispose();
     _novaSenhaCtrl.dispose();
@@ -213,6 +200,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
   }
 
   Future<void> _entrar() async {
+    if (_loading) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
@@ -285,16 +273,20 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     }
   }
 
-  String _restrictedAccessMessage() {
-    final code = PlatformDispatcher.instance.locale.languageCode;
-    if (code == 'es') {
-      return 'Acceso restringido. Credenciales proporcionadas por el administrador.';
-    }
-    if (code == 'en') {
-      return 'Restricted access. Credentials provided by your administrator.';
-    }
-    return 'Acesso restrito. Credenciais fornecidas pelo administrador.';
-  }
+  /// PT copy matches the rest of the login screen (Safari iOS often reports en-US).
+  static const _restrictedAccessMessage =
+      'Acesso restrito. Credenciais fornecidas pelo administrador.';
+
+  ButtonStyle get _loginButtonStyle => ElevatedButton.styleFrom(
+        backgroundColor: AppColors.gold,
+        foregroundColor: AppColors.black,
+        disabledBackgroundColor: AppColors.gold,
+        disabledForegroundColor: AppColors.black,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        elevation: 0,
+        minimumSize: const Size(double.infinity, 56),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      );
 
   String _traduzirErroReset(String code) {
     switch (code) {
@@ -335,11 +327,10 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
       backgroundColor: AppColors.black,
       body: WatermarkBackground(
         child: SafeArea(
-          child: FadeTransition(
-            opacity: _fadeIn,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Form(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,6 +397,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                       hint: 'seu@email.com',
                       icon: Icons.email_outlined,
                       tipo: TextInputType.emailAddress,
+                      autofillHints: const [AutofillHints.email],
+                      textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
                           return 'Digite seu email';
@@ -434,6 +427,10 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                         TextFormField(
                           controller: _senhaCtrl,
                           obscureText: !_senhaVisivel,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _entrar(),
                           style: const TextStyle(
                             color: AppColors.whiteWarm,
                             fontSize: 15,
@@ -458,14 +455,15 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                               size: 18,
                               color: AppColors.gold.withOpacity(0.6),
                             ),
-                            suffixIcon: GestureDetector(
-                              onTap: () => setState(
-                                  () => _senhaVisivel = !_senhaVisivel),
-                              child: Icon(
+                            suffixIcon: IconButton(
+                              onPressed: () => setState(
+                                () => _senhaVisivel = !_senhaVisivel,
+                              ),
+                              icon: Icon(
                                 _senhaVisivel
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
-                                size: 18,
+                                size: 20,
                                 color: AppColors.greyLight,
                               ),
                             ),
@@ -512,9 +510,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                         Align(
                           alignment: Alignment.centerRight,
                           child: GestureDetector(
-                            onTap: _resetLoading || _loading
-                                ? null
-                                : _recuperarSenha,
+                            behavior: HitTestBehavior.opaque,
+                            onTap: _resetLoading ? null : _recuperarSenha,
                             child: _resetLoading
                                 ? const SizedBox(
                                     width: 16,
@@ -612,15 +609,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _loading || _resetLoading ? null : _entrar,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.gold,
-                          foregroundColor: AppColors.black,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          elevation: 0,
-                        ),
+                        onPressed: _entrar,
+                        style: _loginButtonStyle,
                         child: _loading
                             ? const SizedBox(
                                 width: 20,
@@ -643,8 +633,8 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
 
                     const SizedBox(height: 12),
 
-                    Text(
-                      _restrictedAccessMessage(),
+                    const Text(
+                      _restrictedAccessMessage,
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.grey.withValues(alpha: 0.85),
@@ -729,7 +719,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
             ),
           ),
         ),
-      ),
     );
   }
 
@@ -910,6 +899,8 @@ class _Campo extends StatelessWidget {
   final IconData icon;
   final TextInputType tipo;
   final String? Function(String?)? validator;
+  final Iterable<String>? autofillHints;
+  final TextInputAction? textInputAction;
 
   const _Campo({
     required this.ctrl,
@@ -918,6 +909,8 @@ class _Campo extends StatelessWidget {
     required this.icon,
     this.tipo = TextInputType.text,
     this.validator,
+    this.autofillHints,
+    this.textInputAction,
   });
 
   @override
@@ -938,6 +931,9 @@ class _Campo extends StatelessWidget {
         TextFormField(
           controller: ctrl,
           keyboardType: tipo,
+          autofillHints: autofillHints,
+          textInputAction: textInputAction,
+          autocorrect: false,
           style: const TextStyle(color: AppColors.whiteWarm, fontSize: 15),
           validator: validator,
           decoration: InputDecoration(
