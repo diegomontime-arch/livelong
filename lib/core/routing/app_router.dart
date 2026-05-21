@@ -33,6 +33,7 @@ final GoRouter appRouter = GoRouter(
         return LanguageScreen(agentId: sellerSlug);
       },
     ),
+    // Login only — agent accounts are created by admin (no public /signup route).
     GoRoute(
       path: RoutePaths.login,
       builder: (context, state) {

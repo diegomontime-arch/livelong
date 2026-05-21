@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui' show PlatformDispatcher;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/route_paths.dart';
@@ -34,7 +35,6 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
   bool _confirmResetLoading = false;
   bool _senhaVisivel = false;
   bool _novaSenhaVisivel = false;
-  bool _isCadastro = false;
   String? _erro;
   String? _sucesso;
   String? _oobCode;
@@ -225,19 +225,12 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
     final password = _senhaCtrl.text;
 
     try {
-      debugPrint('[HitLook:auth] ${_isCadastro ? "signUp" : "signIn"} $email');
+      debugPrint('[HitLook:auth] signIn $email');
 
-      if (_isCadastro) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-      } else {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-      }
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
       debugPrint('[HitLook:auth] Firebase Auth OK uid=$uid');
@@ -277,7 +270,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
   String _traduzirErro(String code) {
     switch (code) {
       case 'user-not-found':
-        return 'Email não encontrado. Crie uma conta.';
+        return 'Email não encontrado. Solicite acesso ao administrador.';
       case 'wrong-password':
         return 'Senha incorreta. Tente novamente.';
       case 'email-already-in-use':
@@ -291,6 +284,17 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
       default:
         return 'Erro ao entrar. Tente novamente.';
     }
+  }
+
+  String _restrictedAccessMessage() {
+    final code = PlatformDispatcher.instance.locale.languageCode;
+    if (code == 'es') {
+      return 'Acceso restringido. Credenciales proporcionadas por el administrador.';
+    }
+    if (code == 'en') {
+      return 'Restricted access. Credentials provided by your administrator.';
+    }
+    return 'Acesso restrito. Credenciais fornecidas pelo administrador.';
   }
 
   String _traduzirErroReset(String code) {
@@ -374,9 +378,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
 
                     const SizedBox(height: 16),
 
-                    Text(
-                      _isCadastro ? 'CRIAR CONTA' : 'ÁREA DO AGENTE',
-                      style: const TextStyle(
+                    const Text(
+                      'ÁREA DO AGENTE',
+                      style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                         color: AppColors.white,
@@ -386,11 +390,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
 
                     const SizedBox(height: 8),
 
-                    Text(
-                      _isCadastro
-                          ? 'Crie sua conta para acessar o painel.'
-                          : 'Entre para gerenciar seus leads.',
-                      style: const TextStyle(
+                    const Text(
+                      'Entre para gerenciar seus leads.',
+                      style: TextStyle(
                         fontSize: 14,
                         color: AppColors.greyLight,
                       ),
@@ -507,34 +509,32 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                             ),
                           ),
                         ),
-                        if (!_isCadastro) ...[
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: GestureDetector(
-                              onTap: _resetLoading || _loading
-                                  ? null
-                                  : _recuperarSenha,
-                              child: _resetLoading
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.gold,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Esqueceu a senha?',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.gold,
-                                        fontWeight: FontWeight.w500,
-                                      ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(
+                            onTap: _resetLoading || _loading
+                                ? null
+                                : _recuperarSenha,
+                            child: _resetLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.gold,
                                     ),
-                            ),
+                                  )
+                                : const Text(
+                                    'Esqueceu a senha?',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.gold,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
                           ),
-                        ],
+                        ),
                       ],
                     ),
 
@@ -631,9 +631,9 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                                   strokeWidth: 2,
                                 ),
                               )
-                            : Text(
-                                _isCadastro ? 'CRIAR CONTA' : 'ENTRAR',
-                                style: const TextStyle(
+                            : const Text(
+                                'ENTRAR',
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w900,
                                   letterSpacing: 1.5,
@@ -642,27 +642,16 @@ class _AgentLoginScreenState extends State<AgentLoginScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
 
-                    // Toggle login/cadastro
-                    Center(
-                      child: GestureDetector(
-                        onTap: () => setState(() {
-                          _isCadastro = !_isCadastro;
-                          _erro = null;
-                          _sucesso = null;
-                        }),
-                        child: Text(
-                          _isCadastro
-                              ? 'Já tem conta? Fazer login'
-                              : 'Não tem conta? Criar agora',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.gold,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                    Text(
+                      _restrictedAccessMessage(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.grey.withValues(alpha: 0.85),
+                        height: 1.4,
                       ),
+                      textAlign: TextAlign.center,
                     ),
 
                     const SizedBox(height: 32),
