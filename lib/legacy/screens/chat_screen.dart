@@ -151,13 +151,18 @@ YOU CANNOT:
     super.dispose();
   }
 
-  Future<String> _callAPI(String message) async {
+  Future<String> _callAPI() async {
     try {
       final msgs = <Map<String, String>>[];
       for (final m in _messages) {
-        msgs.add({'role': m['role']!, 'content': m['content']!});
+        final role = m['role'];
+        if (role != 'user' && role != 'assistant') continue;
+        msgs.add({'role': role!, 'content': m['content']!});
       }
-      msgs.add({'role': 'user', 'content': message});
+
+      if (msgs.isEmpty) {
+        return '...';
+      }
 
       final response = await http.post(
         Uri.parse(AnaProxyConfig.messagesUrl),
@@ -165,7 +170,7 @@ YOU CANNOT:
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'model': 'claude-sonnet-4-20250514',
+          'model': AnaProxyConfig.model,
           'max_tokens': 600,
           'system': _systemPrompt,
           'messages': msgs,
@@ -173,15 +178,25 @@ YOU CANNOT:
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['content'][0]['text'] ?? '...';
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final content = data['content'] as List?;
+        if (content != null && content.isNotEmpty) {
+          final first = content[0] as Map<String, dynamic>;
+          return first['text'] as String? ?? '...';
+        }
+        return '...';
       }
+
+      debugPrint(
+        '[Ana] API ${response.statusCode}: ${response.body.length > 200 ? response.body.substring(0, 200) : response.body}',
+      );
       return widget.lang == 'en'
           ? 'Sorry, technical issue. Please try again.'
           : widget.lang == 'es'
               ? 'Lo siento, problema técnico. Intenta de nuevo.'
               : 'Desculpe, problema técnico. Tente novamente.';
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[Ana] request failed: $e\n$st');
       return widget.lang == 'en'
           ? 'No connection. Please try again.'
           : widget.lang == 'es'
@@ -201,7 +216,7 @@ YOU CANNOT:
     });
     _scrollDown();
 
-    final reply = await _callAPI(msg);
+    final reply = await _callAPI();
 
     setState(() {
       _messages.add({'role': 'assistant', 'content': reply});

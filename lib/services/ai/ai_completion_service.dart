@@ -34,7 +34,7 @@ class HttpAiCompletionService implements AiCompletionService {
         Uri.parse(_proxyUrl),
         headers: const {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'model': 'claude-sonnet-4-20250514',
+          'model': 'claude-sonnet-4-6',
           'max_tokens': maxTokens,
           'system': systemPrompt,
           'messages': messages,
