@@ -306,6 +306,42 @@ class AgentProvider {
   }
 }
 
+/// Avatar initials: "M4LIFE USA" → M4, "Renan Sampaio" → RS, "Carlos Silva" → CS.
+String agentInitials(String nome) {
+  final words =
+      nome.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+  if (words.isEmpty) return 'M4';
+
+  final first = words[0];
+  if (RegExp(r'[0-9]').hasMatch(first)) {
+    final letters = first.replaceAll(RegExp(r'[^A-Za-z]'), '');
+    final numbers = first.replaceAll(RegExp(r'[^0-9]'), '');
+    if (letters.isNotEmpty && numbers.isNotEmpty) {
+      return '${letters[0].toUpperCase()}${numbers[0]}';
+    }
+  }
+
+  return words.take(2).map((w) => w[0].toUpperCase()).join();
+}
+
+String _initialsNameForAgent(AgentProfile agent) {
+  final isDefaultName = agent.nome.isEmpty ||
+      agent.nome == AgentProfile.defaultProfile.nome;
+
+  if (isDefaultName &&
+      agent.companyId != null &&
+      agent.companyId!.isNotEmpty) {
+    return switch (agent.companyId) {
+      'm4life' => 'M4LIFE USA',
+      'hitlook' => 'HitLook',
+      _ => agent.companyId!.toUpperCase(),
+    };
+  }
+
+  if (isDefaultName) return 'M4LIFE USA';
+  return agent.nome;
+}
+
 // ─── CARD DO AGENTE NA PÁGINA DO CLIENTE ─────────────────
 class AgentCard extends StatelessWidget {
   final AgentProfile agent;
@@ -403,12 +439,10 @@ class AgentCard extends StatelessWidget {
   }
 
   Widget _initials() {
-    final initials = agent.nome.isNotEmpty
-        ? agent.nome.trim().split(' ').map((w) => w[0]).take(2).join()
-        : 'M4';
+    final initials = agentInitials(_initialsNameForAgent(agent));
     return Center(
       child: Text(
-        initials.toUpperCase(),
+        initials,
         style: const TextStyle(
           fontSize: 18,
           fontWeight: FontWeight.w900,

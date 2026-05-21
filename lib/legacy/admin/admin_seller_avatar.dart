@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 class AdminSellerAvatar extends StatelessWidget {
@@ -40,13 +41,7 @@ class AdminSellerAvatar extends StatelessWidget {
   }
 
   Widget _initials() {
-    final parts = displayName.trim().split(RegExp(r'\s+'));
-    final initials = parts
-        .where((p) => p.isNotEmpty)
-        .map((p) => p[0])
-        .take(2)
-        .join()
-        .toUpperCase();
+    final initials = agentInitials(displayName);
     return Center(
       child: Text(
         initials.isEmpty ? '?' : initials,
