@@ -12,4 +12,9 @@ abstract final class AppConfig {
 
   /// Base URL for seller public links shown in admin dashboard.
   static const publicWebBaseUrl = 'https://hitlook-app.web.app';
+
+  /// Diego (HitLook owner) — `users/{uid}.companyId` for platform-wide admin.
+  static const masterCompanyId = 'hitlook';
+
+  static const defaultSellerPassword = 'HitLook2026!';
 }

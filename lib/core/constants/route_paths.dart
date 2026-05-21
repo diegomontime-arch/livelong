@@ -7,7 +7,15 @@ abstract final class RoutePaths {
   static const sellerProfile = '/perfil';
   static const onboarding = '/onboarding';
 
+  static String adminCompany(String companyId) => '$admin/companies/$companyId';
+
+  static String adminCompanySellerLeads(String companyId, String sellerId) =>
+      '$admin/companies/$companyId/sellers/$sellerId';
+
+  /// Legacy path — prefer [adminCompanySellerLeads].
   static String adminSellerLeads(String sellerId) => '$admin/sellers/$sellerId';
+
+  static const splash = '/splash';
 
   /// Public lead form: `/a/:sellerSlug`
   static const publicSellerPrefix = '/a';

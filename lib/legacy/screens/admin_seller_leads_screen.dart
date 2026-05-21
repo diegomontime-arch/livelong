@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/core/utils/result.dart';
+import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'package:hitlook/data/models/lead.dart';
 import 'package:hitlook/data/models/seller.dart';
 import 'package:hitlook/data/repositories/firebase/firebase_lead_repository.dart';
@@ -11,12 +12,18 @@ import 'package:hitlook/legacy/admin/admin_session.dart';
 import 'package:hitlook/legacy/admin/lead_status_ui.dart';
 import 'package:hitlook/legacy/admin/seller_metrics.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
+import 'package:hitlook/legacy/widgets/flow_ux.dart';
 
 /// Admin view of leads for a single seller.
 class AdminSellerLeadsScreen extends StatefulWidget {
-  const AdminSellerLeadsScreen({super.key, required this.sellerId});
+  const AdminSellerLeadsScreen({
+    super.key,
+    required this.sellerId,
+    this.companyId,
+  });
 
   final String sellerId;
+  final String? companyId;
 
   @override
   State<AdminSellerLeadsScreen> createState() => _AdminSellerLeadsScreenState();
@@ -28,6 +35,14 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
 
   AdminSession? _session;
   Seller? _seller;
+  String? _companyId;
+
+  static const _statusOptions = [
+    LeadStatus.newLead,
+    LeadStatus.contacted,
+    LeadStatus.closed,
+    LeadStatus.lost,
+  ];
 
   @override
   void initState() {
@@ -42,10 +57,15 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
       context.go(RoutePaths.dashboard);
       return;
     }
-    setState(() => _session = session);
+
+    final companyId = widget.companyId ?? session.companyId;
+    setState(() {
+      _session = session;
+      _companyId = companyId;
+    });
 
     final result = await _sellerRepo.getById(
-      companyId: session.companyId,
+      companyId: companyId,
       sellerId: widget.sellerId,
     );
     if (!mounted) return;
@@ -54,8 +74,17 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
     }
   }
 
+  void _goBack() {
+    final companyId = _companyId;
+    if (companyId != null) {
+      context.go(RoutePaths.adminCompany(companyId));
+    } else {
+      context.go(RoutePaths.admin);
+    }
+  }
+
   Future<void> _updateStatus(Lead lead, LeadStatus status) async {
-    final companyId = _session?.companyId;
+    final companyId = _companyId;
     if (companyId == null) return;
 
     final result = await _leadRepo.updateStatus(
@@ -78,9 +107,10 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
   @override
   Widget build(BuildContext context) {
     final session = _session;
+    final companyId = _companyId;
     final seller = _seller;
 
-    if (session == null) {
+    if (session == null || companyId == null) {
       return const Scaffold(
         backgroundColor: AppColors.black,
         body: Center(child: CircularProgressIndicator(color: AppColors.gold)),
@@ -105,7 +135,7 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
                 child: Row(
                   children: [
                     IconButton(
-                      onPressed: () => context.go(RoutePaths.admin),
+                      onPressed: _goBack,
                       icon: const Icon(Icons.arrow_back, color: AppColors.gold),
                     ),
                     Expanded(
@@ -113,7 +143,7 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            seller?.displayName ?? 'Vendedor',
+                            seller?.displayName ?? 'Agente',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -137,7 +167,7 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
               Expanded(
                 child: StreamBuilder<List<Lead>>(
                   stream: _leadRepo.watchBySeller(
-                    companyId: session.companyId,
+                    companyId: companyId,
                     sellerId: widget.sellerId,
                   ),
                   builder: (context, snap) {
@@ -156,22 +186,23 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
                       children: [
                         Padding(
                           padding: const EdgeInsets.all(16),
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
+                          child: Row(
                             children: [
-                              _chip('Total', metrics.total),
-                              _chip('Novos', metrics.newLeads),
-                              _chip('Contatados', metrics.contacted),
-                              _chip('Follow-up', metrics.followUp),
-                              _chip('Fechados', metrics.closed),
-                              _chip('Perdidos', metrics.lost),
+                              Expanded(
+                                  child: _chip('Total', metrics.total)),
+                              Expanded(
+                                  child: _chip('Novos', metrics.newLeads)),
+                              Expanded(
+                                  child:
+                                      _chip('Contatados', metrics.contacted)),
+                              Expanded(
+                                  child: _chip('Fechados', metrics.closed)),
                             ],
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: const Text(
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
                             'LEADS',
                             style: TextStyle(
                               fontSize: 11,
@@ -186,7 +217,7 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
                           child: leads.isEmpty
                               ? const Center(
                                   child: Text(
-                                    'Nenhum lead para este vendedor',
+                                    'Nenhum lead para este agente',
                                     style: TextStyle(color: AppColors.grey),
                                   ),
                                 )
@@ -215,16 +246,23 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
   }
 
   Widget _chip(String label, int value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.blackCard,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.gold.withValues(alpha: 0.12)),
-      ),
-      child: Text(
-        '$label: $value',
-        style: const TextStyle(fontSize: 12, color: AppColors.whitesoft),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          Text(
+            '$value',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: AppColors.gold,
+            ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 10, color: AppColors.greyLight),
+          ),
+        ],
       ),
     );
   }
@@ -245,6 +283,7 @@ class _LeadAdminCard extends StatelessWidget {
     final phone = lead.prospectPhone ?? '';
     final score = lead.score ?? 0;
     final statusColor = leadStatusColor(lead.status);
+    final dateLabel = formatLeadDate(lead.createdAt);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -257,20 +296,21 @@ class _LeadAdminCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.gold.withValues(alpha: 0.3)),
+                  border: Border.all(color: AppColors.gold.withValues(alpha: 0.4)),
                 ),
                 child: Center(
                   child: Text(
                     '$score%',
                     style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
                       color: AppColors.gold,
                     ),
                   ),
@@ -284,8 +324,8 @@ class _LeadAdminCard extends StatelessWidget {
                     Text(
                       name,
                       style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
                         color: AppColors.white,
                       ),
                     ),
@@ -297,25 +337,26 @@ class _LeadAdminCard extends StatelessWidget {
                           color: AppColors.greyLight,
                         ),
                       ),
+                    Text(
+                      dateLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.grey.withValues(alpha: 0.85),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+              if (phone.isNotEmpty)
+                IconButton(
+                  onPressed: () {
+                    openWhatsApp(
+                      phone: phone,
+                      message: 'Olá $name, sou o consultor M4LIFE.',
+                    );
+                  },
+                  icon: const Icon(Icons.chat_outlined, color: Color(0xFF25D366)),
                 ),
-                child: Text(
-                  lead.status.labelPt,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    color: statusColor,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -331,10 +372,10 @@ class _LeadAdminCard extends StatelessWidget {
               fillColor: AppColors.black,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(6),
-                borderSide: BorderSide(color: AppColors.gold.withValues(alpha: 0.15)),
+                borderSide: BorderSide(color: statusColor.withValues(alpha: 0.35)),
               ),
             ),
-            items: LeadStatus.values
+            items: _AdminSellerLeadsScreenState._statusOptions
                 .map(
                   (s) => DropdownMenuItem(
                     value: s,

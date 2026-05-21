@@ -65,13 +65,19 @@ class FirebaseSellerRepository implements SellerRepository {
   @override
   Future<Result<Seller>> upsert(Seller seller) {
     return FirestoreMappers.guard(() async {
-      final ref = seller.id.isEmpty
-          ? FirestoreService.collection(
+      final docId = seller.id.isNotEmpty
+          ? seller.id
+          : (seller.slug != null && seller.slug!.trim().isNotEmpty
+              ? seller.slug!.trim()
+              : null);
+
+      final ref = docId != null
+          ? FirestoreService.doc(
+              FirestorePaths.companySeller(seller.companyId, docId),
+            )
+          : FirestoreService.collection(
               FirestorePaths.companySellers(seller.companyId),
-            ).doc()
-          : FirestoreService.doc(
-              FirestorePaths.companySeller(seller.companyId, seller.id),
-            );
+            ).doc();
 
       final payload = {
         ...seller.toMap(),

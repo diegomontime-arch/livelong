@@ -5,11 +5,25 @@ import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/legacy/admin/admin_session.dart';
 
+bool _isPublicSplashPath(String path) {
+  if (path == RoutePaths.splash) return false;
+  if (path == RoutePaths.root) return true;
+  return path.startsWith('${RoutePaths.publicSellerPrefix}/');
+}
+
 /// Auth and role-based redirects for [GoRouter].
 Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
   final qp = state.uri.queryParameters;
   final oobCode = qp['oobCode'];
   final mode = qp['mode'];
+  final path = state.uri.path;
+
+  if (_isPublicSplashPath(path) && qp['splash'] != 'done') {
+    final next = state.uri.toString();
+    return '${RoutePaths.splash}?next=${Uri.encodeComponent(next)}';
+  }
+
+  if (path == RoutePaths.splash) return null;
 
   // Password-reset links must land on /login (not / or other routes).
   if (mode == 'resetPassword' &&
@@ -20,7 +34,6 @@ Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
   }
 
   final isLoggedIn = FirebaseAuth.instance.currentUser != null;
-  final path = state.uri.path;
 
   final sellerPaths = {
     RoutePaths.dashboard,

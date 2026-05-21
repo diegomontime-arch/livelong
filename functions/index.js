@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const https = require("https");
@@ -57,6 +58,41 @@ exports.anthropicProxy = functions.https.onRequest((req, res) => {
 });
 
 const LANG_LABEL = { pt: "Português", es: "Español", en: "English" };
+
+/**
+ * Admin creates seller Auth account + returns uid (password set server-side).
+ */
+exports.createSellerAccount = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Login required");
+    }
+
+    const callerDoc = await db.collection("users").doc(request.auth.uid).get();
+    if (!callerDoc.exists || callerDoc.data().role !== "admin") {
+      throw new HttpsError("permission-denied", "Admin only");
+    }
+
+    const { email, password, displayName, companyId } = request.data || {};
+    if (!email || !password || !displayName || !companyId) {
+      throw new HttpsError("invalid-argument", "Missing required fields");
+    }
+
+    try {
+      const user = await admin.auth().createUser({
+        email: String(email).trim(),
+        password: String(password),
+        displayName: String(displayName).trim(),
+      });
+      logger.info("createSellerAccount OK", { uid: user.uid, companyId });
+      return { uid: user.uid };
+    } catch (e) {
+      logger.error("createSellerAccount failed", e);
+      throw new HttpsError("internal", e.message || "Failed to create user");
+    }
+  },
+);
 
 /**
  * Queues email via Firebase Extension "Trigger Email from Firestore" (`mail`).

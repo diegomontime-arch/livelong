@@ -22,6 +22,18 @@ class FirebaseCompanyRepository implements CompanyRepository {
   }
 
   @override
+  Stream<List<Company>> watchAll() {
+    return FirestoreService.collection(FirestorePaths.companies)
+        .orderBy('name')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => _fromSnapshot(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  @override
   Future<Result<Company>> create(Company company) {
     return FirestoreMappers.guard(() async {
       final ref = company.id.isEmpty
