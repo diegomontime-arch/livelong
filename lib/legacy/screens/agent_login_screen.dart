@@ -633,7 +633,7 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
 
                     const SizedBox(height: 12),
 
-                    const Text(
+                    Text(
                       _restrictedAccessMessage,
                       style: TextStyle(
                         fontSize: 11,
