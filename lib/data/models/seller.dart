@@ -11,6 +11,10 @@ class Seller {
     this.bio,
     this.userId,
     this.isActive = true,
+    this.idioma,
+    this.nicho,
+    this.instagramUrl,
+    this.linkedinUrl,
   });
 
   final String id;
@@ -23,6 +27,10 @@ class Seller {
   final String? bio;
   final String? userId;
   final bool isActive;
+  final String? idioma;
+  final String? nicho;
+  final String? instagramUrl;
+  final String? linkedinUrl;
 
   factory Seller.fromMap(String id, Map<String, dynamic> map) {
     return Seller(
@@ -36,6 +44,10 @@ class Seller {
       bio: map['bio'] as String?,
       userId: map['userId'] as String?,
       isActive: map['isActive'] as bool? ?? true,
+      idioma: map['idioma'] as String?,
+      nicho: map['nicho'] as String?,
+      instagramUrl: map['instagramUrl'] as String?,
+      linkedinUrl: map['linkedinUrl'] as String?,
     );
   }
 
@@ -49,5 +61,27 @@ class Seller {
         if (bio != null) 'bio': bio,
         if (userId != null) 'userId': userId,
         'isActive': isActive,
+        if (idioma != null) 'idioma': idioma,
+        if (nicho != null) 'nicho': nicho,
+        if (instagramUrl != null) 'instagramUrl': instagramUrl,
+        if (linkedinUrl != null) 'linkedinUrl': linkedinUrl,
       };
+}
+
+/// Display labels for seller profile fields in admin UI.
+abstract final class SellerProfileLabels {
+  static const idiomas = {'pt': 'Português', 'es': 'Español', 'en': 'English'};
+
+  static const nichos = {
+    'seguro': 'Seguro de Vida',
+    'pisos': 'Pisos',
+    'solar': 'Solar',
+    'mortgage': 'Mortgage',
+  };
+
+  static String idioma(String? code) =>
+      idiomas[code ?? 'pt'] ?? idiomas['pt']!;
+
+  static String nicho(String? code) =>
+      nichos[code ?? 'seguro'] ?? nichos['seguro']!;
 }

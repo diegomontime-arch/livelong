@@ -8,6 +8,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/firestore_paths.dart';
+import 'package:hitlook/data/models/seller.dart';
+import 'package:hitlook/legacy/admin/admin_seller_avatar.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/widgets/flow_ux.dart';
 
@@ -22,13 +24,24 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   final _nomeCtrl = TextEditingController();
   final _bioCtrl = TextEditingController();
   final _whatsappCtrl = TextEditingController();
+  final _instagramCtrl = TextEditingController();
+  final _linkedinCtrl = TextEditingController();
+  final _senhaAtualCtrl = TextEditingController();
+  final _senhaNovaCtrl = TextEditingController();
+  final _senhaConfirmCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   Uint8List? _fotoBytes;
   String? _fotoUrl;
   String? _fotoContentType;
   final ImagePicker _imagePicker = ImagePicker();
+  String _idioma = 'pt';
+  String _nicho = 'seguro';
   bool _loading = false;
   bool _salvando = false;
+  bool _alterandoSenha = false;
+  bool _obscureAtual = true;
+  bool _obscureNova = true;
+  bool _obscureConfirm = true;
 
   @override
   void initState() {
@@ -41,6 +54,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     _nomeCtrl.dispose();
     _bioCtrl.dispose();
     _whatsappCtrl.dispose();
+    _instagramCtrl.dispose();
+    _linkedinCtrl.dispose();
+    _senhaAtualCtrl.dispose();
+    _senhaNovaCtrl.dispose();
+    _senhaConfirmCtrl.dispose();
     super.dispose();
   }
 
@@ -58,7 +76,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         _nomeCtrl.text = data['nome'] ?? '';
         _bioCtrl.text = data['bio'] ?? '';
         _whatsappCtrl.text = data['whatsapp'] ?? '';
-        setState(() => _fotoUrl = data['fotoUrl']);
+        _instagramCtrl.text = data['instagramUrl'] as String? ?? '';
+        _linkedinCtrl.text = data['linkedinUrl'] as String? ?? '';
+        _idioma = data['idioma'] as String? ?? 'pt';
+        _nicho = data['nicho'] as String? ?? 'seguro';
+        setState(() => _fotoUrl = data['fotoUrl'] as String?);
       }
     } catch (e) {}
     setState(() => _loading = false);
@@ -155,14 +177,19 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       final whatsapp = _whatsappCtrl.text.trim();
       final foto = fotoUrl ?? '';
 
+      final instagram = _instagramCtrl.text.trim();
+      final linkedin = _linkedinCtrl.text.trim();
+
       await FirebaseFirestore.instance.collection('agents').doc(uid).set({
         'nome': nome,
         'bio': bio,
         'whatsapp': whatsapp,
         'fotoUrl': foto,
         'userId': uid,
-        'idioma': 'pt',
-        'nicho': 'seguro',
+        'idioma': _idioma,
+        'nicho': _nicho,
+        if (instagram.isNotEmpty) 'instagramUrl': instagram,
+        if (linkedin.isNotEmpty) 'linkedinUrl': linkedin,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -173,6 +200,10 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
           bio: bio,
           whatsapp: whatsapp,
           fotoUrl: foto,
+          idioma: _idioma,
+          nicho: _nicho,
+          instagramUrl: instagram,
+          linkedinUrl: linkedin,
         );
       } catch (_) {
         // Perfil principal já foi salvo; sync SaaS/slug é best-effort.
@@ -210,12 +241,77 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   }
 
   /// Keeps SaaS seller + public slug doc in sync with legacy `agents/{uid}`.
+  Future<void> _alterarSenha() async {
+    final atual = _senhaAtualCtrl.text;
+    final nova = _senhaNovaCtrl.text;
+    final confirm = _senhaConfirmCtrl.text;
+
+    if (atual.isEmpty || nova.isEmpty || confirm.isEmpty) {
+      _snack('Preencha todos os campos de senha.', isError: true);
+      return;
+    }
+    if (nova.length < 6) {
+      _snack('A nova senha deve ter pelo menos 6 caracteres.', isError: true);
+      return;
+    }
+    if (nova != confirm) {
+      _snack('A confirmação não coincide com a nova senha.', isError: true);
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email;
+    if (user == null || email == null || email.isEmpty) {
+      _snack('Sessão inválida. Faça login novamente.', isError: true);
+      return;
+    }
+
+    setState(() => _alterandoSenha = true);
+    try {
+      final cred = EmailAuthProvider.credential(
+        email: email,
+        password: atual,
+      );
+      await user.reauthenticateWithCredential(cred);
+      await user.updatePassword(nova);
+      _senhaAtualCtrl.clear();
+      _senhaNovaCtrl.clear();
+      _senhaConfirmCtrl.clear();
+      _snack('Senha alterada com sucesso!');
+    } on FirebaseAuthException catch (e) {
+      final msg = switch (e.code) {
+        'wrong-password' || 'invalid-credential' => 'Senha atual incorreta.',
+        'weak-password' => 'Senha fraca. Use pelo menos 6 caracteres.',
+        _ => e.message ?? 'Não foi possível alterar a senha.',
+      };
+      _snack(msg, isError: true);
+    } catch (e) {
+      _snack('Erro: $e', isError: true);
+    } finally {
+      if (mounted) setState(() => _alterandoSenha = false);
+    }
+  }
+
+  void _snack(String msg, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? const Color(0xFFE74C3C) : AppColors.gold,
+      ),
+    );
+  }
+
   Future<void> _syncSellerAndPublicSlug({
     required String uid,
     required String nome,
     required String bio,
     required String whatsapp,
     required String fotoUrl,
+    required String idioma,
+    required String nicho,
+    required String instagramUrl,
+    required String linkedinUrl,
   }) async {
     final userSnap =
         await FirebaseFirestore.instance.collection('users').doc(uid).get();
@@ -234,6 +330,10 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       'phone': whatsapp,
       if (fotoUrl.isNotEmpty) 'photoUrl': fotoUrl,
       'userId': uid,
+      'idioma': idioma,
+      'nicho': nicho,
+      if (instagramUrl.isNotEmpty) 'instagramUrl': instagramUrl,
+      if (linkedinUrl.isNotEmpty) 'linkedinUrl': linkedinUrl,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
@@ -247,8 +347,10 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       'fotoUrl': fotoUrl,
       'userId': uid,
       'slug': slug,
-      'idioma': 'pt',
-      'nicho': 'seguro',
+      'idioma': idioma,
+      'nicho': nicho,
+      if (instagramUrl.isNotEmpty) 'instagramUrl': instagramUrl,
+      if (linkedinUrl.isNotEmpty) 'linkedinUrl': linkedinUrl,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
@@ -303,79 +405,47 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
 
                         const SizedBox(height: 32),
 
-                        // Foto
                         Center(
-                          child: GestureDetector(
-                            onTap: _selecionarFoto,
-                            child: Stack(
-                              children: [
-                                Container(
-                                  width: 100,
-                                  height: 100,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: AppColors.blackCard,
-                                    border: Border.all(
-                                      color: AppColors.gold,
-                                      width: 2,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              _fotoBytes != null
+                                  ? ClipOval(
+                                      child: Image.memory(
+                                        _fotoBytes!,
+                                        width: 100,
+                                        height: 100,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    )
+                                  : AdminSellerAvatar(
+                                      displayName: _nomeCtrl.text.isNotEmpty
+                                          ? _nomeCtrl.text
+                                          : 'Agente',
+                                      photoUrl: _fotoUrl,
+                                      size: 100,
                                     ),
-                                  ),
-                                  child: ClipOval(
-                                    child: _fotoBytes != null
-                                        ? Image.memory(
-                                            _fotoBytes!,
-                                            fit: BoxFit.cover,
-                                            width: 100,
-                                            height: 100,
-                                          )
-                                        : _fotoUrl != null &&
-                                                _fotoUrl!.isNotEmpty
-                                            ? Image.network(
-                                                _fotoUrl!,
-                                                fit: BoxFit.cover,
-                                                width: 100,
-                                                height: 100,
-                                                errorBuilder: (_, __, ___) =>
-                                                    const Center(
-                                                  child: Icon(
-                                                    Icons.broken_image_outlined,
-                                                    size: 40,
-                                                    color: AppColors.gold,
-                                                  ),
-                                                ),
-                                              )
-                                            : const Center(
-                                                child: Icon(
-                                                  Icons.person_outline,
-                                                  size: 40,
-                                                  color: AppColors.gold,
-                                                ),
-                                              ),
-                                  ),
-                                ),
-                                Positioned(
-                                  bottom: 0,
-                                  right: 0,
-                                  child: Container(
-                                    width: 30,
-                                    height: 30,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.gold,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
+                              Positioned(
+                                bottom: 0,
+                                right: 0,
+                                child: Material(
+                                  color: AppColors.gold,
+                                  shape: const CircleBorder(),
+                                  child: InkWell(
+                                    onTap: _selecionarFoto,
+                                    customBorder: const CircleBorder(),
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(8),
+                                      child: Icon(
+                                        Icons.camera_alt_outlined,
+                                        size: 18,
                                         color: AppColors.black,
-                                        width: 2,
                                       ),
                                     ),
-                                    child: const Icon(
-                                      Icons.camera_alt_outlined,
-                                      size: 14,
-                                      color: AppColors.black,
-                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
 
@@ -384,8 +454,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                         Center(
                           child: Text(
                             _fotoBytes != null
-                                ? 'Foto selecionada — clique em SALVAR PERFIL'
-                                : 'Toque para escolher sua foto',
+                                ? 'Preview — salve para publicar a foto'
+                                : 'Toque no ícone da câmera para enviar foto',
                             style: TextStyle(
                               fontSize: 12,
                               color: _fotoBytes != null
@@ -428,6 +498,42 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                           validator: (v) => v == null || v.trim().isEmpty
                               ? 'Digite seu WhatsApp'
                               : null,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        _DropdownCampo(
+                          label: 'IDIOMA PREFERIDO',
+                          value: _idioma,
+                          items: SellerProfileLabels.idiomas,
+                          onChanged: (v) => setState(() => _idioma = v),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        _DropdownCampo(
+                          label: 'NICHO',
+                          value: _nicho,
+                          items: SellerProfileLabels.nichos,
+                          onChanged: (v) => setState(() => _nicho = v),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        _Campo(
+                          ctrl: _instagramCtrl,
+                          label: 'INSTAGRAM (opcional)',
+                          hint: 'https://instagram.com/seu-perfil',
+                          icon: Icons.camera_alt_outlined,
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        _Campo(
+                          ctrl: _linkedinCtrl,
+                          label: 'LINKEDIN (opcional)',
+                          hint: 'https://linkedin.com/in/seu-perfil',
+                          icon: Icons.work_outline,
                         ),
 
                         const SizedBox(height: 16),
@@ -482,7 +588,87 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                           },
                         ),
 
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 28),
+
+                        const Text(
+                          'SEGURANÇA',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.gold,
+                            letterSpacing: 2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _Campo(
+                          ctrl: _senhaAtualCtrl,
+                          label: 'SENHA ATUAL',
+                          hint: '••••••••',
+                          icon: Icons.lock_outline,
+                          obscure: _obscureAtual,
+                          onToggleObscure: () =>
+                              setState(() => _obscureAtual = !_obscureAtual),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _Campo(
+                          ctrl: _senhaNovaCtrl,
+                          label: 'NOVA SENHA',
+                          hint: 'Mínimo 6 caracteres',
+                          icon: Icons.lock_reset,
+                          obscure: _obscureNova,
+                          onToggleObscure: () =>
+                              setState(() => _obscureNova = !_obscureNova),
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        _Campo(
+                          ctrl: _senhaConfirmCtrl,
+                          label: 'CONFIRMAR NOVA SENHA',
+                          hint: 'Repita a nova senha',
+                          icon: Icons.lock_reset,
+                          obscure: _obscureConfirm,
+                          onToggleObscure: () => setState(
+                            () => _obscureConfirm = !_obscureConfirm,
+                          ),
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton(
+                            onPressed: _alterandoSenha ? null : _alterarSenha,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.gold,
+                              side: BorderSide(
+                                color: AppColors.gold.withOpacity(0.5),
+                              ),
+                            ),
+                            child: _alterandoSenha
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text(
+                                    'ALTERAR SENHA',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 28),
 
                         SizedBox(
                           width: double.infinity,
@@ -528,6 +714,66 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   }
 }
 
+class _DropdownCampo extends StatelessWidget {
+  const _DropdownCampo({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final Map<String, String> items;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.greyLight,
+            fontWeight: FontWeight.w500,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: value,
+          dropdownColor: AppColors.blackCard,
+          style: const TextStyle(color: AppColors.whiteWarm, fontSize: 15),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.blackCard,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide:
+                  BorderSide(color: AppColors.gold.withOpacity(0.15)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(6),
+              borderSide:
+                  BorderSide(color: AppColors.gold.withOpacity(0.15)),
+            ),
+          ),
+          items: items.entries
+              .map(
+                (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+              )
+              .toList(),
+          onChanged: (v) {
+            if (v != null) onChanged(v);
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _Campo extends StatelessWidget {
   final TextEditingController ctrl;
   final String label;
@@ -535,6 +781,8 @@ class _Campo extends StatelessWidget {
   final IconData icon;
   final TextInputType tipo;
   final String? Function(String?)? validator;
+  final bool obscure;
+  final VoidCallback? onToggleObscure;
 
   const _Campo({
     required this.ctrl,
@@ -543,6 +791,8 @@ class _Campo extends StatelessWidget {
     required this.icon,
     this.tipo = TextInputType.text,
     this.validator,
+    this.obscure = false,
+    this.onToggleObscure,
   });
 
   @override
@@ -563,6 +813,7 @@ class _Campo extends StatelessWidget {
         TextFormField(
           controller: ctrl,
           keyboardType: tipo,
+          obscureText: obscure,
           style: const TextStyle(color: AppColors.whiteWarm, fontSize: 15),
           validator: validator,
           decoration: InputDecoration(
@@ -570,6 +821,18 @@ class _Campo extends StatelessWidget {
             hintStyle: const TextStyle(color: AppColors.grey, fontSize: 14),
             prefixIcon: Icon(icon,
                 size: 18, color: AppColors.gold.withOpacity(0.6)),
+            suffixIcon: onToggleObscure == null
+                ? null
+                : IconButton(
+                    onPressed: onToggleObscure,
+                    icon: Icon(
+                      obscure
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined,
+                      color: AppColors.greyLight,
+                      size: 20,
+                    ),
+                  ),
             filled: true,
             fillColor: AppColors.blackCard,
             border: OutlineInputBorder(

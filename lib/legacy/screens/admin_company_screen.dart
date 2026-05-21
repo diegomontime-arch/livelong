@@ -7,6 +7,7 @@ import 'package:hitlook/core/config/app_config.dart';
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/data/models/lead.dart';
 import 'package:hitlook/data/models/seller.dart';
+import 'package:hitlook/legacy/widgets/flow_ux.dart';
 import 'package:hitlook/data/repositories/firebase/firebase_lead_repository.dart';
 import 'package:hitlook/data/repositories/firebase/firebase_seller_repository.dart';
 import 'package:hitlook/legacy/admin/admin_session.dart';
@@ -122,12 +123,6 @@ class _AdminCompanyScreenState extends State<AdminCompanyScreen> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      onPressed: _createSeller,
-                      icon: const Icon(Icons.add_circle_outline,
-                          color: AppColors.gold, size: 28),
-                      tooltip: 'Adicionar agente',
-                    ),
                     TextButton.icon(
                       onPressed: _createSeller,
                       icon: const Icon(Icons.add, size: 18, color: AppColors.gold),
@@ -173,6 +168,10 @@ class _AdminCompanyScreenState extends State<AdminCompanyScreen> {
                                 seller: s,
                                 metrics: metricsBySeller[s.id] ??
                                     const SellerMetrics.empty(),
+                                lastLeadAt: SellerWithMetrics.lastLeadDateFor(
+                                  leads,
+                                  s.id,
+                                ),
                               ),
                             )
                             .toList();
@@ -269,9 +268,12 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            onPressed: onLogout,
-            icon: const Icon(Icons.logout, color: AppColors.greyLight, size: 22),
+          Tooltip(
+            message: 'Sair',
+            child: IconButton(
+              onPressed: onLogout,
+              icon: const Icon(Icons.logout, color: AppColors.gold, size: 24),
+            ),
           ),
         ],
       ),
@@ -400,6 +402,32 @@ class _SellerCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppColors.greyLight,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      SellerProfileLabels.idioma(row.seller.idioma),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.grey,
+                      ),
+                    ),
+                    Text(
+                      SellerProfileLabels.nicho(row.seller.nicho),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.grey,
+                      ),
+                    ),
+                    Text(
+                      row.lastLeadAt != null
+                          ? 'Último lead: ${formatLeadDate(row.lastLeadAt)}'
+                          : 'Nenhum lead ainda',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: row.lastLeadAt != null
+                            ? AppColors.goldDim
+                            : AppColors.grey,
                       ),
                     ),
                   ],

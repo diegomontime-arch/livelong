@@ -70,10 +70,26 @@ class SellerMetrics {
 
 /// Seller row model for the admin dashboard list.
 class SellerWithMetrics {
-  const SellerWithMetrics({required this.seller, required this.metrics});
+  const SellerWithMetrics({
+    required this.seller,
+    required this.metrics,
+    this.lastLeadAt,
+  });
 
   final Seller seller;
   final SellerMetrics metrics;
+  final DateTime? lastLeadAt;
+
+  static DateTime? lastLeadDateFor(List<Lead> leads, String sellerId) {
+    DateTime? latest;
+    for (final lead in leads) {
+      if (lead.sellerId != sellerId) continue;
+      final dt = lead.createdAt;
+      if (dt == null) continue;
+      if (latest == null || dt.isAfter(latest)) latest = dt;
+    }
+    return latest;
+  }
 
   String publicLink(String baseUrl) {
     final slug = seller.slug ?? seller.id;
