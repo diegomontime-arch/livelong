@@ -357,6 +357,43 @@ class M4LifeLogo extends StatelessWidget {
   }
 }
 
+// ─── HITLOOK LOGO (platform / master admin) ───────────────
+class HitLookLogo extends StatelessWidget {
+  const HitLookLogo({super.key, this.fontSize = 28, this.letterSpacing = 4});
+
+  final double fontSize;
+  final double letterSpacing;
+
+  @override
+  Widget build(BuildContext context) {
+    return RichText(
+      text: TextSpan(
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
+        children: [
+          TextSpan(
+            text: 'HIT',
+            style: TextStyle(
+              color: AppColors.white,
+              letterSpacing: letterSpacing,
+            ),
+          ),
+          TextSpan(
+            text: 'LOOK',
+            style: TextStyle(
+              color: AppColors.gold,
+              letterSpacing: letterSpacing,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── LANGUAGE SCREEN ──────────────────────────────────────
 class LanguageScreen extends StatefulWidget {
   final String agentId;

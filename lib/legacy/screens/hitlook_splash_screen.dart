@@ -73,30 +73,7 @@ class _HitLookSplashScreenState extends State<HitLookSplashScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  RichText(
-                    text: const TextSpan(
-                      children: [
-                        TextSpan(
-                          text: 'HIT',
-                          style: TextStyle(
-                            fontSize: 42,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.white,
-                            letterSpacing: 8,
-                          ),
-                        ),
-                        TextSpan(
-                          text: 'LOOK',
-                          style: TextStyle(
-                            fontSize: 42,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.gold,
-                            letterSpacing: 8,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const HitLookLogo(fontSize: 42, letterSpacing: 8),
                   const SizedBox(height: 12),
                   Text(
                     'AI · PROTECTION · SALES',

@@ -48,7 +48,7 @@ class _AdminMasterScreenState extends State<AdminMasterScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _MasterHeader(
-                title: _session?.displayName ?? 'HitLook',
+                title: _session?.displayName ?? 'Diego Rocha',
                 onLogout: _logout,
               ),
               const Padding(
@@ -124,7 +124,7 @@ class _MasterHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const M4LifeLogo(fontSize: 18, showTagline: false),
+          const HitLookLogo(fontSize: 22, letterSpacing: 3),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -144,7 +144,7 @@ class _MasterHeader extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.white,
+                    color: AppColors.whiteWarm,
                   ),
                 ),
               ],
@@ -152,7 +152,8 @@ class _MasterHeader extends StatelessWidget {
           ),
           IconButton(
             onPressed: onLogout,
-            icon: const Icon(Icons.logout, color: AppColors.greyLight, size: 22),
+            tooltip: 'Sair',
+            icon: const Icon(Icons.logout, color: AppColors.gold, size: 24),
           ),
         ],
       ),
@@ -198,18 +199,21 @@ class _CompanyCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.white,
+                        color: AppColors.whiteWarm,
                       ),
                     ),
                   ),
+                  _StatusChip(active: company.isActive),
+                  const SizedBox(width: 8),
                   const Icon(Icons.chevron_right, color: AppColors.gold),
                 ],
               ),
+              const SizedBox(height: 4),
               Text(
-                company.id,
-                style: const TextStyle(fontSize: 12, color: AppColors.greyLight),
+                company.id.toUpperCase(),
+                style: const TextStyle(fontSize: 11, color: AppColors.greyLight),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               StreamBuilder(
                 stream: sellerRepo.watchByCompany(company.id),
                 builder: (context, sellersSnap) {
@@ -221,7 +225,7 @@ class _CompanyCard extends StatelessWidget {
                       return Row(
                         children: [
                           _Stat(label: 'Agentes', value: '$agentCount'),
-                          const SizedBox(width: 20),
+                          const SizedBox(width: 24),
                           _Stat(label: 'Leads', value: '$leadCount'),
                         ],
                       );
@@ -231,6 +235,39 @@ class _CompanyCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({required this.active});
+
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: active
+            ? AppColors.gold.withValues(alpha: 0.12)
+            : AppColors.grey.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: active
+              ? AppColors.gold.withValues(alpha: 0.4)
+              : AppColors.grey.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Text(
+        active ? 'ATIVO' : 'INATIVO',
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1,
+          color: active ? AppColors.gold : AppColors.greyLight,
         ),
       ),
     );
