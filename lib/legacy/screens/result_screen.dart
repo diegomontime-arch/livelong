@@ -35,6 +35,7 @@ class _ResultScreenState extends State<ResultScreen>
   late AnimationController _ctrl;
   late Animation<double> _fadeIn;
   late Animation<double> _scoreAnim;
+  String _consultantPhone = kDefaultConsultantWhatsApp;
 
   double _renda = 3000;
   int _anos = 10;
@@ -228,9 +229,24 @@ class _ResultScreenState extends State<ResultScreen>
     return (m[key] ?? {})[l] ?? (m[key] ?? {})['pt'] ?? key;
   }
 
+  Future<void> _preloadConsultantPhone() async {
+    if (widget.agentId.isEmpty || widget.agentId == 'default') return;
+
+    try {
+      final agent = await AgentProvider.loadAgent(widget.agentId);
+      final raw = agent.whatsapp.trim();
+      if (raw.isNotEmpty && normalizeWhatsAppNumber(raw).isNotEmpty) {
+        if (mounted) setState(() => _consultantPhone = raw);
+      }
+    } catch (_) {
+      // Keep default Renan number.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _preloadConsultantPhone();
     _saveLead();
     _ctrl = AnimationController(
       vsync: this,
@@ -285,28 +301,21 @@ class _ResultScreenState extends State<ResultScreen>
 
   Future<void> _abrirWhatsApp() async {
     if (_whatsAppLoading) return;
-    final agentId = widget.agentId;
-    if (agentId.isEmpty || agentId == 'default') {
-      _mostrarErroWhatsApp();
-      return;
-    }
 
     setState(() => _whatsAppLoading = true);
     try {
-      final agent = await AgentProvider.loadAgent(agentId);
-      final rawWhatsapp = agent.whatsapp.trim();
-      if (rawWhatsapp.isEmpty) {
-        _mostrarErroWhatsApp();
-        return;
-      }
+      final phone = _consultantPhone.trim().isNotEmpty
+          ? _consultantPhone
+          : kDefaultConsultantWhatsApp;
 
-      if (normalizeWhatsAppNumber(rawWhatsapp).isEmpty) {
+      if (normalizeWhatsAppNumber(phone).isEmpty) {
         _mostrarErroWhatsApp();
         return;
       }
 
       final msg = buildLeadWhatsAppMessage(lang: widget.lang, score: _score);
-      final opened = await openWhatsApp(phone: rawWhatsapp, message: msg);
+      // No await before launchUrl — keeps user-gesture chain on Flutter Web.
+      final opened = await openWhatsApp(phone: phone, message: msg);
       if (!opened) _mostrarErroWhatsApp();
     } catch (_) {
       _mostrarErroWhatsApp();

@@ -1,4 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+/// Default consultant WhatsApp (Renan) when agent profile has no number.
+const kDefaultConsultantWhatsApp = '17869738628';
 
 /// Normalizes a phone number for wa.me (digits only; US 10-digit → prepend 1).
 String normalizeWhatsAppNumber(String raw) {
@@ -19,6 +23,14 @@ Future<bool> openWhatsApp({
   final uri = Uri.parse(
     'https://wa.me/$numero?text=${Uri.encodeComponent(message)}',
   );
+
+  if (kIsWeb) {
+    return launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+      webOnlyWindowName: '_blank',
+    );
+  }
   return launchUrl(uri, mode: LaunchMode.externalApplication);
 }
 
@@ -28,14 +40,15 @@ String buildLeadWhatsAppMessage({
 }) {
   if (lang == 'es') {
     return '¡Hola! Acabo de hacer el diagnóstico de protección familiar y '
-        'recibí una puntuación de $score%. Me gustaría saber más sobre las '
+        'recibí un score de $score%. Me gustaría saber más sobre las '
         'opciones disponibles.';
   }
   if (lang == 'en') {
-    return 'Hi! I just completed the family protection assessment and '
-        'received a score of $score%. I would like to learn more about the '
-        'available options.';
+    return 'Hi! I just completed the family protection diagnosis and '
+        'received a score of $score%. I\'d like to know more about the '
+        'available options for my family.';
   }
   return 'Olá! Acabei de fazer o diagnóstico de proteção familiar e recebi '
-      'um score de $score%. Gostaria de saber mais sobre as opções disponíveis.';
+      'um score de $score%. Gostaria de saber mais sobre as opções '
+      'disponíveis para minha família.';
 }
