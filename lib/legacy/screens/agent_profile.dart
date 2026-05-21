@@ -13,6 +13,8 @@ class AgentProfile {
   final String idioma;
   final String nicho;
   final String? userId;
+  final String? companyId;
+  final String? sellerId;
 
   const AgentProfile({
     required this.id,
@@ -23,7 +25,15 @@ class AgentProfile {
     required this.idioma,
     required this.nicho,
     this.userId,
+    this.companyId,
+    this.sellerId,
   });
+
+  bool get hasSaaSContext =>
+      companyId != null &&
+      companyId!.isNotEmpty &&
+      sellerId != null &&
+      sellerId!.isNotEmpty;
 
   factory AgentProfile.fromMap(String id, Map<String, dynamic> map) {
     return AgentProfile(
@@ -37,10 +47,17 @@ class AgentProfile {
       idioma: map['idioma'] as String? ?? 'pt',
       nicho: map['nicho'] as String? ?? 'seguro',
       userId: map['userId'] as String?,
+      companyId: map['companyId'] as String?,
+      sellerId: map['sellerId'] as String?,
     );
   }
 
-  factory AgentProfile.fromSeller(String slug, Map<String, dynamic> seller) {
+  factory AgentProfile.fromSeller(
+    String slug,
+    Map<String, dynamic> seller, {
+    String? companyId,
+    String? sellerId,
+  }) {
     return AgentProfile(
       id: slug,
       nome: seller['displayName'] as String? ?? '',
@@ -49,9 +66,11 @@ class AgentProfile {
           seller['whatsapp'] as String? ??
           '',
       fotoUrl: seller['photoUrl'] as String? ?? '',
-      idioma: 'pt',
-      nicho: 'seguro',
+      idioma: seller['idioma'] as String? ?? 'pt',
+      nicho: seller['nicho'] as String? ?? 'seguro',
       userId: seller['userId'] as String?,
+      companyId: companyId ?? seller['companyId'] as String?,
+      sellerId: sellerId ?? seller['sellerId'] as String?,
     );
   }
 
@@ -63,6 +82,8 @@ class AgentProfile {
     fotoUrl: '',
     idioma: 'pt',
     nicho: 'seguro',
+    companyId: null,
+    sellerId: null,
   );
 }
 
@@ -177,6 +198,8 @@ class AgentProvider {
     var profile = AgentProfile.fromSeller(
       sellerDoc.data()?['slug'] as String? ?? sellerId,
       sellerDoc.data()!,
+      companyId: companyId,
+      sellerId: sellerId,
     );
 
     final legacy = await _loadAgentsDoc(uid);
@@ -205,14 +228,24 @@ class AgentProvider {
         .doc(sellerId)
         .get();
     if (!sellerDoc.exists || sellerDoc.data() == null) return null;
-    return AgentProfile.fromSeller(sellerId, sellerDoc.data()!);
+    final slug = sellerDoc.data()?['slug'] as String? ?? sellerId;
+    return AgentProfile.fromSeller(
+      slug,
+      sellerDoc.data()!,
+      companyId: companyId,
+      sellerId: sellerId,
+    );
   }
 
   static Future<AgentProfile?> _loadViaSellerSlug(String slug) async {
     final slugDoc = await _db.collection('seller_slugs').doc(slug).get();
     if (!slugDoc.exists || slugDoc.data() == null) return null;
 
-    final profile = await _loadSellerFromSlugData(slugDoc.data()!);
+    final slugData = slugDoc.data()!;
+    final companyId = slugData['companyId'] as String?;
+    final sellerId = slugData['sellerId'] as String?;
+
+    final profile = await _loadSellerFromSlugData(slugData);
     if (profile == null) return null;
 
     var merged = AgentProfile(
@@ -224,6 +257,8 @@ class AgentProvider {
       idioma: profile.idioma,
       nicho: profile.nicho,
       userId: profile.userId,
+      companyId: companyId ?? profile.companyId,
+      sellerId: sellerId ?? profile.sellerId,
     );
 
     final slugMirror = await _loadAgentsDoc(slug);
@@ -250,7 +285,15 @@ class AgentProvider {
       idioma: primary.idioma,
       nicho: primary.nicho,
       userId: primary.userId ?? legacy.userId,
+      companyId: _pickString(primary.companyId, legacy.companyId),
+      sellerId: _pickString(primary.sellerId, legacy.sellerId),
     );
+  }
+
+  static String? _pickString(String? a, String? b) {
+    if (a != null && a.isNotEmpty) return a;
+    if (b != null && b.isNotEmpty) return b;
+    return null;
   }
 
   static AgentProfile _mergeAll(List<AgentProfile> profiles) {

@@ -140,7 +140,9 @@ class _ResultScreenState extends State<ResultScreen>
   Future<void> _saveLead() async {
     try {
       final ownerUid = await AgentProvider.resolveOwnerUid(widget.agentId);
-      await FirebaseFirestore.instance.collection('leads').add({
+      final agent = await AgentProvider.loadAgent(widget.agentId);
+
+      final legacyPayload = {
         'agentId': ownerUid,
         'nome': widget.nome,
         'telefone': widget.telefone,
@@ -150,7 +152,35 @@ class _ResultScreenState extends State<ResultScreen>
         'score': _score,
         'status': 'novo',
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      await FirebaseFirestore.instance.collection('leads').add(legacyPayload);
+
+      if (agent.hasSaaSContext) {
+        final companyId = agent.companyId!;
+        final sellerId = agent.sellerId!;
+        await FirebaseFirestore.instance
+            .collection('companies')
+            .doc(companyId)
+            .collection('leads')
+            .add({
+          'companyId': companyId,
+          'sellerId': sellerId,
+          'agentId': ownerUid,
+          'nome': widget.nome,
+          'telefone': widget.telefone,
+          'prospectName': widget.nome,
+          'prospectPhone': widget.telefone,
+          'nascimento': widget.nascimento,
+          'lang': widget.lang,
+          'locale': widget.lang,
+          'answers': widget.answers,
+          'score': _score,
+          'status': 'novo',
+          'createdAt': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
     } catch (e) {
       // ignora erro silenciosamente
     }

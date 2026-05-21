@@ -36,8 +36,12 @@ class Lead {
       score: (map['score'] as num?)?.toInt(),
       answers: Map<String, dynamic>.from(map['answers'] as Map? ?? {}),
       recommendedPlan: map['recommendedPlan'] as String?,
-      prospectName: map['prospectName'] as String? ?? map['name'] as String?,
-      prospectPhone: map['prospectPhone'] as String? ?? map['phone'] as String?,
+      prospectName: map['prospectName'] as String? ??
+          map['nome'] as String? ??
+          map['name'] as String?,
+      prospectPhone: map['prospectPhone'] as String? ??
+          map['telefone'] as String? ??
+          map['phone'] as String?,
       createdAt: map['createdAt'] is DateTime ? map['createdAt'] as DateTime : null,
     );
   }
