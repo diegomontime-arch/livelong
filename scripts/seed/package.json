@@ -10,7 +10,8 @@
     "setup:diego:dry-run": "node setup_diego.js --dry-run",
     "setup:renan": "node setup_renan.js",
     "setup:renan:dry-run": "node setup_renan.js --dry-run",
-    "clear:leads": "node clear_leads.js"
+    "clear:leads": "node clear_leads.js",
+    "setup:diego-test-agent": "node setup_diego_test_agent.js"
   },
   "engines": {
     "node": ">=20"

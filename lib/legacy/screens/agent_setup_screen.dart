@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -70,20 +71,39 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       final doc = await FirebaseFirestore.instance
           .collection('agents')
           .doc(uid)
-          .get();
+          .get(const GetOptions(source: Source.server));
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
-        _nomeCtrl.text = data['nome'] ?? '';
-        _bioCtrl.text = data['bio'] ?? '';
-        _whatsappCtrl.text = data['whatsapp'] ?? '';
+        _nomeCtrl.text = data['nome'] as String? ?? '';
+        _bioCtrl.text = data['bio'] as String? ?? '';
+        _whatsappCtrl.text = data['whatsapp'] as String? ?? '';
         _instagramCtrl.text = data['instagramUrl'] as String? ?? '';
         _linkedinCtrl.text = data['linkedinUrl'] as String? ?? '';
         _idioma = data['idioma'] as String? ?? 'pt';
         _nicho = data['nicho'] as String? ?? 'seguro';
-        setState(() => _fotoUrl = data['fotoUrl'] as String?);
+        final url = data['fotoUrl'] as String? ?? data['photoUrl'] as String?;
+        debugPrint('[HitLook:Profile] load agents/$uid fotoUrl=$url');
+        if (mounted) {
+          setState(() {
+            _fotoUrl = url;
+            _fotoBytes = null;
+          });
+        }
+      } else {
+        debugPrint('[HitLook:Profile] agents/$uid doc missing');
       }
-    } catch (e) {}
-    setState(() => _loading = false);
+    } catch (e, st) {
+      debugPrint('[HitLook:Profile] load FAILED: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao carregar perfil: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _selecionarFoto() async {
@@ -137,11 +157,14 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   Future<String?> _uploadFoto(String uid) async {
     if (_fotoBytes == null) return _fotoUrl;
     final ref = FirebaseStorage.instance.ref().child('agents/$uid/photo');
+    debugPrint('[HitLook:Profile] uploading → agents/$uid/photo');
     final task = await ref.putData(
       _fotoBytes!,
       SettableMetadata(contentType: _fotoContentType ?? 'image/jpeg'),
     );
-    return task.ref.getDownloadURL();
+    final url = await task.ref.getDownloadURL();
+    debugPrint('[HitLook:Profile] upload OK → $url');
+    return url;
   }
 
   Future<void> _salvar() async {
@@ -171,11 +194,16 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     }
     setState(() => _salvando = true);
     try {
-      final fotoUrl = await _uploadFoto(uid);
+      String? foto;
+      if (_fotoBytes != null) {
+        foto = await _uploadFoto(uid);
+      } else {
+        foto = _fotoUrl;
+      }
       final nome = _nomeCtrl.text.trim();
       final bio = _bioCtrl.text.trim();
       final whatsapp = _whatsappCtrl.text.trim();
-      final foto = fotoUrl ?? '';
+      final fotoFinal = foto?.trim() ?? '';
 
       final instagram = _instagramCtrl.text.trim();
       final linkedin = _linkedinCtrl.text.trim();
@@ -184,7 +212,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         'nome': nome,
         'bio': bio,
         'whatsapp': whatsapp,
-        'fotoUrl': foto,
+        'fotoUrl': fotoFinal,
         'userId': uid,
         'idioma': _idioma,
         'nicho': _nicho,
@@ -193,32 +221,45 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      debugPrint(
+        '[HitLook:Profile] saved agents/$uid fotoUrl=$fotoFinal',
+      );
+
       try {
         await _syncSellerAndPublicSlug(
           uid: uid,
           nome: nome,
           bio: bio,
           whatsapp: whatsapp,
-          fotoUrl: foto,
+          fotoUrl: fotoFinal,
           idioma: _idioma,
           nicho: _nicho,
           instagramUrl: instagram,
           linkedinUrl: linkedin,
         );
-      } catch (_) {
-        // Perfil principal já foi salvo; sync SaaS/slug é best-effort.
+        debugPrint('[HitLook:Profile] synced seller + agents/{slug}');
+      } catch (e, st) {
+        debugPrint('[HitLook:Profile] sync warning: $e\n$st');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Perfil salvo, mas o link público pode demorar: $e',
+              ),
+              backgroundColor: const Color(0xFFF39C12),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
       }
 
+      await _loadPerfil();
+
       if (mounted) {
-        setState(() {
-          if (foto.isNotEmpty) _fotoUrl = foto;
-          _fotoBytes = null;
-          _fotoContentType = null;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              foto.isNotEmpty
+              fotoFinal.isNotEmpty
                   ? 'Perfil salvo com foto!'
                   : 'Perfil salvo (sem foto).',
             ),
@@ -226,7 +267,8 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
           ),
         );
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[HitLook:Profile] save FAILED: $e\n$st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -324,8 +366,12 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     final sellerRef = FirebaseFirestore.instance
         .doc(FirestorePaths.companySeller(companyId, sellerId));
 
+    final sellerSnap = await sellerRef.get();
+    final slug = sellerSnap.data()?['slug'] as String? ?? sellerId;
+
     await sellerRef.set({
       'displayName': nome,
+      'slug': slug,
       'bio': bio,
       'phone': whatsapp,
       if (fotoUrl.isNotEmpty) 'photoUrl': fotoUrl,
@@ -336,9 +382,9 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       if (linkedinUrl.isNotEmpty) 'linkedinUrl': linkedinUrl,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-
-    final slug = (await sellerRef.get()).data()?['slug'] as String?;
-    if (slug == null || slug.isEmpty) return;
+    debugPrint(
+      '[HitLook:Profile] sync seller/$sellerId slug=$slug fotoUrl=$fotoUrl',
+    );
 
     await FirebaseFirestore.instance.collection('agents').doc(slug).set({
       'nome': nome,

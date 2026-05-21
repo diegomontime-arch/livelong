@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hitlook/core/utils/whatsapp_utils.dart';
@@ -128,39 +129,93 @@ class AgentProvider {
     }
 
     try {
-      final profiles = <AgentProfile>[];
-
-      final viaSlug = await _loadViaSellerSlug(agentId);
-      if (viaSlug != null) profiles.add(viaSlug);
+      debugPrint('[HitLook:Agent] loadAgent start → $agentId');
 
       if (looksLikeFirebaseUid(agentId)) {
-        final viaUser = await _loadViaUserId(agentId);
-        if (viaUser != null) profiles.add(viaUser);
+        final profile = await _loadByUid(agentId);
+        return _finalizeProfile(profile, agentId);
       }
 
-      final direct = await _loadAgentsDoc(agentId);
-      if (direct != null) profiles.add(direct);
-
-      var merged = _mergeAll(profiles);
-      if (_isConfigured(merged)) return merged;
-
-      // Slug mirror: agents/{slug} when URL used UID but profile lives under slug doc.
-      if (looksLikeFirebaseUid(agentId) && merged.userId != null) {
-        final userSnap = await _db.collection('users').doc(agentId).get();
-        final sellerId = userSnap.data()?['sellerId'] as String?;
-        if (sellerId != null && sellerId.isNotEmpty) {
-          final slugAgent = await _loadAgentsDoc(sellerId);
-          if (slugAgent != null) {
-            merged = _merge(merged, slugAgent);
-            if (_isConfigured(merged)) return merged;
-          }
-        }
-      }
-
-      return merged.nome.isNotEmpty ? merged : AgentProfile.defaultProfile;
-    } catch (_) {
+      final profile = await _loadByPublicSlug(agentId);
+      return _finalizeProfile(profile, agentId);
+    } catch (e, st) {
+      debugPrint('[HitLook:Agent] loadAgent FAILED: $e\n$st');
       return AgentProfile.defaultProfile;
     }
+  }
+
+  static Future<AgentProfile> _loadByUid(String uid) async {
+    final profiles = <AgentProfile>[];
+    final viaUser = await _loadViaUserId(uid);
+    if (viaUser != null) profiles.add(viaUser);
+    final direct = await _loadAgentsDoc(uid);
+    if (direct != null) profiles.add(direct);
+    return _mergeAll(profiles);
+  }
+
+  /// seller_slugs/{slug} → seller → agents/{userId} + agents/{slug}
+  static Future<AgentProfile> _loadByPublicSlug(String slug) async {
+    final slugSnap = await _db
+        .collection('seller_slugs')
+        .doc(slug)
+        .get(const GetOptions(source: Source.server));
+    debugPrint(
+      '[HitLook:Agent] seller_slugs/$slug exists=${slugSnap.exists}',
+    );
+
+    if (!slugSnap.exists || slugSnap.data() == null) {
+      debugPrint('[HitLook:Agent] slug missing — trying agents/$slug only');
+      final mirror = await _loadAgentsDoc(slug);
+      return mirror ?? AgentProfile.defaultProfile;
+    }
+
+    final slugData = slugSnap.data()!;
+    final companyId = slugData['companyId'] as String?;
+    final sellerId = slugData['sellerId'] as String?;
+    debugPrint(
+      '[HitLook:Agent] slug map → companyId=$companyId sellerId=$sellerId',
+    );
+
+    var profile = await _loadSellerFromSlugData(slugData);
+    if (profile == null) {
+      debugPrint('[HitLook:Agent] seller doc missing');
+      return AgentProfile.defaultProfile;
+    }
+
+    debugPrint(
+      '[HitLook:Agent] seller → nome="${profile.nome}" userId=${profile.userId}',
+    );
+
+    final uid = profile.userId;
+    if (uid != null && uid.isNotEmpty) {
+      final uidDoc = await _loadAgentsDoc(uid);
+      debugPrint(
+        '[HitLook:Agent] agents/$uid → nome="${uidDoc?.nome}" fotoUrl=${uidDoc?.fotoUrl.isNotEmpty == true}',
+      );
+      if (uidDoc != null) profile = _merge(profile, uidDoc);
+    }
+
+    final slugMirror = await _loadAgentsDoc(slug);
+    debugPrint(
+      '[HitLook:Agent] agents/$slug → nome="${slugMirror?.nome}" fotoUrl=${slugMirror?.fotoUrl.isNotEmpty == true}',
+    );
+    if (slugMirror != null) profile = _merge(profile, slugMirror);
+
+    debugPrint(
+      '[HitLook:Agent] merged → nome="${profile.nome}" fotoUrl=${profile.fotoUrl.isNotEmpty}',
+    );
+    return profile;
+  }
+
+  static AgentProfile _finalizeProfile(AgentProfile profile, String agentId) {
+    if (_isConfigured(profile)) {
+      debugPrint('[HitLook:Agent] OK configured id=$agentId nome=${profile.nome}');
+      return profile;
+    }
+    debugPrint(
+      '[HitLook:Agent] fallback default id=$agentId nome="${profile.nome}"',
+    );
+    return profile.nome.isNotEmpty ? profile : AgentProfile.defaultProfile;
   }
 
   static bool _isConfigured(AgentProfile profile) {
@@ -168,8 +223,14 @@ class AgentProvider {
         profile.nome != AgentProfile.defaultProfile.nome;
   }
 
+  static bool _isDefaultNome(String nome) =>
+      nome.isEmpty || nome == AgentProfile.defaultProfile.nome;
+
   static Future<AgentProfile?> _loadAgentsDoc(String id) async {
-    final doc = await _db.collection('agents').doc(id).get();
+    final doc = await _db
+        .collection('agents')
+        .doc(id)
+        .get(const GetOptions(source: Source.server));
     if (!doc.exists || doc.data() == null) return null;
     return AgentProfile.fromMap(id, doc.data()!);
   }
@@ -190,7 +251,7 @@ class AgentProvider {
         .doc(companyId)
         .collection('sellers')
         .doc(sellerId)
-        .get();
+        .get(const GetOptions(source: Source.server));
     if (!sellerDoc.exists || sellerDoc.data() == null) {
       return await _loadAgentsDoc(uid);
     }
@@ -226,7 +287,7 @@ class AgentProvider {
         .doc(companyId)
         .collection('sellers')
         .doc(sellerId)
-        .get();
+        .get(const GetOptions(source: Source.server));
     if (!sellerDoc.exists || sellerDoc.data() == null) return null;
     final slug = sellerDoc.data()?['slug'] as String? ?? sellerId;
     return AgentProfile.fromSeller(
@@ -237,46 +298,12 @@ class AgentProvider {
     );
   }
 
-  static Future<AgentProfile?> _loadViaSellerSlug(String slug) async {
-    final slugDoc = await _db.collection('seller_slugs').doc(slug).get();
-    if (!slugDoc.exists || slugDoc.data() == null) return null;
-
-    final slugData = slugDoc.data()!;
-    final companyId = slugData['companyId'] as String?;
-    final sellerId = slugData['sellerId'] as String?;
-
-    final profile = await _loadSellerFromSlugData(slugData);
-    if (profile == null) return null;
-
-    var merged = AgentProfile(
-      id: slug,
-      nome: profile.nome,
-      bio: profile.bio,
-      whatsapp: profile.whatsapp,
-      fotoUrl: profile.fotoUrl,
-      idioma: profile.idioma,
-      nicho: profile.nicho,
-      userId: profile.userId,
-      companyId: companyId ?? profile.companyId,
-      sellerId: sellerId ?? profile.sellerId,
-    );
-
-    final slugMirror = await _loadAgentsDoc(slug);
-    if (slugMirror != null) merged = _merge(merged, slugMirror);
-
-    final linkedUid = profile.userId;
-    if (linkedUid != null && linkedUid.isNotEmpty) {
-      final legacy = await _loadAgentsDoc(linkedUid);
-      if (legacy != null) merged = _merge(merged, legacy);
-    }
-
-    return merged;
-  }
-
   static AgentProfile _merge(AgentProfile primary, AgentProfile legacy) {
     return AgentProfile(
       id: primary.id,
-      nome: primary.nome.isNotEmpty ? primary.nome : legacy.nome,
+      nome: !_isDefaultNome(primary.nome)
+          ? primary.nome
+          : (!_isDefaultNome(legacy.nome) ? legacy.nome : primary.nome),
       bio: primary.bio.isNotEmpty ? primary.bio : legacy.bio,
       whatsapp:
           primary.whatsapp.isNotEmpty ? primary.whatsapp : legacy.whatsapp,
