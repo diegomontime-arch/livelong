@@ -43,6 +43,13 @@ service cloud.firestore {
       return isCompanyMember(companyId) && userRole() == 'admin';
     }
 
+    // HitLook platform owner (Diego) — read all tenants/companies in master admin.
+    function isHitLookMaster() {
+      return userExists()
+        && userCompanyId() == 'hitlook'
+        && userRole() == 'admin';
+    }
+
     function isSellerInCompany(companyId, sellerId) {
       return isCompanyMember(companyId) && userSellerId() == sellerId;
     }
@@ -207,7 +214,7 @@ service cloud.firestore {
     // -------------------------------------------------------------------------
 
     match /companies/{companyId} {
-      allow read: if isCompanyMember(companyId);
+      allow read: if isCompanyMember(companyId) || isHitLookMaster();
 
       allow create: if isSignedIn()
         && request.resource.data.keys().hasOnly([
@@ -232,7 +239,7 @@ service cloud.firestore {
 
       match /sellers/{sellerId} {
         allow get: if true;
-        allow list: if isCompanyMember(companyId);
+        allow list: if isCompanyMember(companyId) || isHitLookMaster();
 
         allow create: if isCompanyAdmin(companyId)
           || (
@@ -255,7 +262,8 @@ service cloud.firestore {
       // -----------------------------------------------------------------------
 
       match /leads/{leadId} {
-        allow read: if isCompanyAdmin(companyId)
+        allow read: if isHitLookMaster()
+          || isCompanyAdmin(companyId)
           || (
             isSignedIn()
             && isCompanyMember(companyId)

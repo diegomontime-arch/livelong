@@ -73,6 +73,19 @@ class _AdminMasterScreenState extends State<AdminMasterScreen> {
                       );
                     }
 
+                    if (snap.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Erro ao carregar empresas: ${snap.error}',
+                            style: const TextStyle(color: AppColors.greyLight),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      );
+                    }
+
                     final companies = snap.data ?? [];
                     if (companies.isEmpty) {
                       return const Center(

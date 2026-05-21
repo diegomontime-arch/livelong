@@ -23,14 +23,17 @@ class FirebaseCompanyRepository implements CompanyRepository {
 
   @override
   Stream<List<Company>> watchAll() {
-    return FirestoreService.collection(FirestorePaths.companies)
-        .orderBy('name')
-        .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => _fromSnapshot(doc.id, doc.data()))
-              .toList(),
+    return FirestoreService.collection(FirestorePaths.companies).snapshots().map(
+      (snapshot) {
+        final companies = snapshot.docs
+            .map((doc) => _fromSnapshot(doc.id, doc.data()))
+            .toList();
+        companies.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
         );
+        return companies;
+      },
+    );
   }
 
   @override
@@ -63,7 +66,9 @@ class FirebaseCompanyRepository implements CompanyRepository {
     return Company(
       id: id,
       tenantId: data['tenantId'] as String? ?? '',
-      name: data['name'] as String? ?? '',
+      name: data['name'] as String? ??
+          data['displayName'] as String? ??
+          id.toUpperCase(),
       plan: CompanyPlan.fromString(data['plan'] as String?),
       isActive: data['isActive'] as bool? ?? true,
       createdAt: FirestoreMappers.timestampFrom(data['createdAt']),

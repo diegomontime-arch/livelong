@@ -7,6 +7,10 @@ import 'package:hitlook/legacy/admin/admin_session.dart';
 
 bool _isPublicSplashPath(String path) {
   if (path == RoutePaths.splash) return false;
+  return _isPublicClientPath(path);
+}
+
+bool _isPublicClientPath(String path) {
   if (path == RoutePaths.root) return true;
   return path.startsWith('${RoutePaths.publicSellerPrefix}/');
 }
@@ -24,6 +28,9 @@ Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
   }
 
   if (path == RoutePaths.splash) return null;
+
+  // Public lead funnel — never redirect logged-in admins/agents away.
+  if (_isPublicClientPath(path)) return null;
 
   // Password-reset links must land on /login (not / or other routes).
   if (mode == 'resetPassword' &&
