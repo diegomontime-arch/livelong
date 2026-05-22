@@ -392,9 +392,9 @@ class AgentProvider {
     );
   }
 
-  static String _firstNonEmpty(List<String> values) {
+  static String _firstNonEmpty(List<String?> values) {
     for (final v in values) {
-      final t = v.trim();
+      final t = v?.trim() ?? '';
       if (t.isNotEmpty) return t;
     }
     return '';
