@@ -24,3 +24,4 @@ cd ~/livelong && ./save.sh "descrição do que mudou"
 | 06-BUSINESS_MODEL.md | Modelo de negócio |
 | 07-RISKS.md | Riscos e como mitigar |
 | 08-BRIEFING.md | Briefing para Claude/Cowork/GPT |
+| 11-SCHEMA-DEFINITIVO.md | **Schema Firestore único** + fluxos agent/lead |

@@ -109,12 +109,19 @@ class AgentProfile {
 }
 
 // ─── PROVIDER DO AGENTE ──────────────────────────────────
+///
+/// Resolução pública em 3 passos (ver docs/11-SCHEMA-DEFINITIVO.md §5).
 class AgentProvider {
   static final _db = FirebaseFirestore.instance;
 
-  /// Firebase Auth UIDs are typically 28 characters.
+  static const _brandNome = 'M4LIFE USA';
+
+  /// Firebase Auth UIDs are typically 28 characters, alphanumeric only.
   static bool looksLikeFirebaseUid(String id) =>
       id.length >= 20 && RegExp(r'^[A-Za-z0-9]+$').hasMatch(id);
+
+  static bool isPublicSlug(String id) =>
+      id.isNotEmpty && id != 'default' && !looksLikeFirebaseUid(id);
 
   /// Public URL segment for `/a/{id}` — prefers seller slug over Firebase UID.
   static Future<String> resolvePublicLinkId(String uid) async {
@@ -143,7 +150,7 @@ class AgentProvider {
     return uid;
   }
 
-  /// Resolves public link id (slug or UID) to the owner's Auth UID for leads.
+  /// Resolves slug or UID → Firebase Auth UID (para gravar leads).
   static Future<String> resolveOwnerUid(String agentId) async {
     if (agentId.isEmpty || agentId == 'default') return agentId;
     if (looksLikeFirebaseUid(agentId)) return agentId;
@@ -152,368 +159,261 @@ class AgentProvider {
     if (profile.userId != null && profile.userId!.isNotEmpty) {
       return profile.userId!;
     }
-    if (looksLikeFirebaseUid(profile.id)) return profile.id;
-
-    final slugDoc = await _db.collection('seller_slugs').doc(agentId).get();
-    if (slugDoc.exists) {
-      final seller = await _loadSellerFromSlugData(slugDoc.data() ?? {});
-      if (seller?.userId != null && seller!.userId!.isNotEmpty) {
-        return seller.userId!;
-      }
-    }
-
-    final agentsDoc = await _db.collection('agents').doc(agentId).get();
-    final uid = agentsDoc.data()?['userId'] as String?;
-    if (uid != null && uid.isNotEmpty) return uid;
-
     return agentId;
   }
 
-  /// Loads the public seller profile for [agentId] (Firebase UID or public slug).
+  /// Carrega perfil para `/a/{slug}` ou `/a/{uid}`.
   static Future<AgentProfile> loadAgent(String agentId) async {
     if (agentId.isEmpty || agentId == 'default') {
-      debugPrint('[HitLook:Agent] loadAgent → default (empty id)');
+      debugPrint('[HitLook:Agent] loadAgent → rota / (default)');
       return AgentProfile.defaultProfile;
     }
 
     try {
-      debugPrint('[HitLook:Agent] ═══ loadAgent("$agentId") ═══');
-
       if (looksLikeFirebaseUid(agentId)) {
-        final profile = await _loadByUid(agentId);
-        return _finalizeProfile(profile, agentId);
+        return _loadByAuthUid(agentId);
       }
-
-      final profile = await _loadByPublicSlug(agentId);
-      return _finalizeProfile(profile, agentId);
+      return _loadPublicBySlug(agentId);
     } catch (e, st) {
-      debugPrint('[HitLook:Agent] loadAgent FAILED slug=$agentId: $e\n$st');
+      debugPrint('[HitLook:Agent] loadAgent ERRO id=$agentId: $e\n$st');
+      if (isPublicSlug(agentId)) {
+        return _profileFromSlugOnly(agentId);
+      }
       return AgentProfile.defaultProfile;
     }
   }
 
-  static Future<AgentProfile> _loadByUid(String uid) async {
-    final profiles = <AgentProfile>[];
+  // ─── Link público: 3 passos ───────────────────────────────
 
-    final direct = await _loadAgentsDoc(uid);
-    if (direct != null) profiles.add(direct);
+  static Future<AgentProfile> _loadPublicBySlug(String slug) async {
+    debugPrint('[HitLook:Agent] ▶ loadAgent("$slug")');
 
-    final uidSnap = await _db
-        .collection('agents')
-        .doc(uid)
-        .get(const GetOptions(source: Source.server));
-    final slug = uidSnap.data()?['slug'] as String?;
-    if (slug != null && slug.isNotEmpty && slug != uid) {
-      final fromSlug = await _loadByPublicSlug(slug);
-      profiles.add(fromSlug);
-      debugPrint(
-        '[HitLook:Agent] uid→slug/$slug nome="${fromSlug.nome}"',
-      );
-      return _mergeAll(profiles);
+    // PASSO 1 — seller_slugs → companies/.../sellers (fonte da verdade)
+    final seller = await _step1LoadSeller(slug);
+    if (seller == null) {
+      debugPrint('[HitLook:Agent] PASSO 1 falhou — tentando agents/$slug');
+      final mirror = await _readAgentsDoc(slug);
+      if (mirror != null && _hasRealData(mirror)) {
+        return _attachPublicSlug(mirror, slug);
+      }
+      debugPrint('[HitLook:Agent] ■ fallback slug-only');
+      return _profileFromSlugOnly(slug);
     }
 
-    try {
-      final viaUser = await _loadViaUserId(uid);
-      if (viaUser != null) profiles.add(viaUser);
-    } catch (e) {
-      debugPrint('[HitLook:Agent] viaUser skipped: $e');
-    }
-
-    return _mergeAll(profiles);
-  }
-
-  /// seller_slugs/{slug} → companies/.../sellers → agents/{userId} + agents/{slug}
-  static Future<AgentProfile> _loadByPublicSlug(String slug) async {
-    debugPrint('[HitLook:Agent] (1/5) seller_slugs/$slug');
-
-    final slugSnap = await _getDoc(_db.collection('seller_slugs').doc(slug));
-    debugPrint(
-      '[HitLook:Agent] (1/5) exists=${slugSnap.exists} data=${slugSnap.data()}',
-    );
-
-    if (!slugSnap.exists || slugSnap.data() == null) {
-      debugPrint('[HitLook:Agent] (1/5) miss — fallback agents/$slug only');
-      final mirror = await _loadAgentsDoc(slug);
-      return mirror ?? AgentProfile.defaultProfile;
-    }
-
-    final slugData = slugSnap.data()!;
-    final companyId = slugData['companyId'] as String?;
-    final sellerId = slugData['sellerId'] as String?;
-    debugPrint(
-      '[HitLook:Agent] (2/5) companies/$companyId/sellers/$sellerId',
-    );
-
-    var profile = await _loadSellerFromSlugData(slugData);
-    if (profile == null) {
-      debugPrint('[HitLook:Agent] (2/5) seller MISSING');
-      final mirror = await _loadAgentsDoc(slug);
-      return mirror ?? AgentProfile.defaultProfile;
-    }
-
-    debugPrint(
-      '[HitLook:Agent] (2/5) seller OK nome="${profile.nome}" '
-      'userId=${profile.userId} photo=${profile.fotoUrl.isNotEmpty}',
-    );
-
-    final uid = profile.userId?.trim() ?? '';
+    // PASSO 2 — agents/{userId} (fotoUrl, nome legado)
+    AgentProfile? legacy;
+    final uid = seller.userId?.trim() ?? '';
     if (uid.isNotEmpty) {
-      debugPrint('[HitLook:Agent] (3/5) agents/$uid (priority merge)');
-      final uidDoc = await _loadAgentsDoc(uid);
-      debugPrint(
-        '[HitLook:Agent] (3/5) agents/$uid exists=${uidDoc != null} '
-        'nome="${uidDoc?.nome}" foto=${uidDoc?.fotoUrl.isNotEmpty == true}',
-      );
-      if (uidDoc != null) profile = _mergeAgentsPriority(profile, uidDoc);
+      legacy = await _step2LoadAgentsUid(uid);
     } else {
-      debugPrint('[HitLook:Agent] (3/5) SKIP — seller has no userId');
+      debugPrint('[HitLook:Agent] PASSO 2 pulado — seller sem userId');
     }
 
-    debugPrint('[HitLook:Agent] (4/5) agents/$slug mirror');
-    final slugMirror = await _loadAgentsDoc(slug);
+    // PASSO 3 — merge
+    final profile = _step3Merge(slug, seller, legacy);
     debugPrint(
-      '[HitLook:Agent] (4/5) mirror nome="${slugMirror?.nome}" '
-      'foto=${slugMirror?.fotoUrl.isNotEmpty == true}',
-    );
-    if (slugMirror != null) profile = _mergeAgentsPriority(profile, slugMirror);
-
-    profile = _withPublicSlugContext(profile, slug);
-
-    debugPrint(
-      '[HitLook:Agent] (5/5) RESULT slug=$slug nome="${profile.nome}" '
-      'resolved="${profile.resolvedNome}" foto=${profile.fotoUrl.isNotEmpty} '
-      'userId=${profile.userId} cardId=${profile.id}',
+      '[HitLook:Agent] ■ OK slug=$slug nome="${profile.nome}" '
+      'foto=${profile.fotoUrl.isNotEmpty} userId=${profile.userId}',
     );
     return profile;
   }
 
-  /// Public /a/{slug} pages always use slug as card id and a resolved agent name.
-  static AgentProfile _withPublicSlugContext(AgentProfile profile, String slug) {
-    final resolved = profile.resolvedNome;
-    final nome = resolved.isNotEmpty
-        ? resolved
-        : formatSlugAsDisplayName(slug);
-    return AgentProfile(
-      id: slug,
-      nome: nome,
-      displayName: profile.displayName ?? nome,
-      bio: profile.bio,
-      whatsapp: profile.whatsapp,
-      fotoUrl: profile.fotoUrl,
-      idioma: profile.idioma,
-      nicho: profile.nicho,
-      userId: profile.userId,
-      companyId: profile.companyId,
-      sellerId: profile.sellerId,
-    );
-  }
+  /// PASSO 1: `seller_slugs/{slug}` → documento seller.
+  static Future<AgentProfile?> _step1LoadSeller(String slug) async {
+    debugPrint('[HitLook:Agent] PASSO 1 seller_slugs/$slug');
 
-  static AgentProfile _finalizeProfile(AgentProfile profile, String agentId) {
-    final isPublicSlug = agentId.isNotEmpty &&
-        agentId != 'default' &&
-        !looksLikeFirebaseUid(agentId);
-
-    if (_hasPublicIdentity(profile)) {
-      final out = isPublicSlug ? _withPublicSlugContext(profile, agentId) : profile;
-      debugPrint(
-        '[HitLook:Agent] ✓ finalize OK id=$agentId nome="${out.nome}" '
-        'foto=${out.fotoUrl.isNotEmpty} userId=${out.userId}',
-      );
-      return out;
-    }
-
-    if (isPublicSlug) {
-      debugPrint(
-        '[HitLook:Agent] finalize minimal slug=$agentId (firestore partial)',
-      );
-      return _withPublicSlugContext(profile, agentId);
-    }
-
-    debugPrint(
-      '[HitLook:Agent] ✗ finalize DEFAULT id=$agentId '
-      '(nome="${profile.nome}" userId=${profile.userId})',
-    );
-    return AgentProfile.defaultProfile;
-  }
-
-  static bool _hasPublicIdentity(AgentProfile profile) {
-    if (profile.fotoUrl.trim().isNotEmpty) return true;
-    if (profile.resolvedNome.isNotEmpty &&
-        !_isDefaultNome(profile.resolvedNome)) {
-      return true;
-    }
-    return profile.userId != null &&
-        profile.userId!.isNotEmpty &&
-        profile.hasSaaSContext;
-  }
-
-  static bool _isDefaultNome(String nome) =>
-      nome.isEmpty || nome == AgentProfile.defaultProfile.nome;
-
-  static Future<DocumentSnapshot<Map<String, dynamic>>> _getDoc(
-    DocumentReference<Map<String, dynamic>> ref,
-  ) async {
-    return ref.get();
-  }
-
-  static Future<AgentProfile?> _loadAgentsDoc(String id) async {
-    final doc = await _getDoc(_db.collection('agents').doc(id));
-    if (!doc.exists || doc.data() == null) return null;
-    final data = doc.data()!;
-    debugPrint(
-      '[HitLook:Agent] agents/$id fields: nome=${data['nome']} '
-      'fotoUrl=${data['fotoUrl'] ?? data['photoUrl']} userId=${data['userId']}',
-    );
-    return AgentProfile.fromMap(id, data);
-  }
-
-  static Future<AgentProfile?> _loadViaUserId(String uid) async {
-    DocumentSnapshot<Map<String, dynamic>> userDoc;
-    try {
-      userDoc = await _db.collection('users').doc(uid).get();
-    } catch (e) {
-      debugPrint('[HitLook:Agent] users/$uid read denied: $e');
+    final index = await _db.collection('seller_slugs').doc(slug).get();
+    if (!index.exists || index.data() == null) {
+      debugPrint('[HitLook:Agent] PASSO 1 índice inexistente');
       return null;
     }
-    if (!userDoc.exists || userDoc.data() == null) return null;
 
-    final data = userDoc.data()!;
-    final companyId = data['companyId'] as String?;
-    final sellerId = data['sellerId'] as String?;
-    if (companyId == null || sellerId == null) {
-      return await _loadAgentsDoc(uid);
-    }
+    final companyId = index.data()!['companyId'] as String?;
+    final sellerId = index.data()!['sellerId'] as String?;
+    debugPrint('[HitLook:Agent] PASSO 1 → companyId=$companyId sellerId=$sellerId');
+
+    if (companyId == null || sellerId == null) return null;
 
     final sellerDoc = await _db
         .collection('companies')
         .doc(companyId)
         .collection('sellers')
         .doc(sellerId)
-        .get(const GetOptions(source: Source.server));
+        .get();
+
     if (!sellerDoc.exists || sellerDoc.data() == null) {
-      return await _loadAgentsDoc(uid);
+      debugPrint('[HitLook:Agent] PASSO 1 seller doc ausente');
+      return null;
     }
 
-    var profile = AgentProfile.fromSeller(
-      sellerDoc.data()?['slug'] as String? ?? sellerId,
-      sellerDoc.data()!,
-      companyId: companyId,
-      sellerId: sellerId,
-    );
-
-    final legacy = await _loadAgentsDoc(uid);
-    if (legacy != null) profile = _mergeAgentsPriority(profile, legacy);
-
-    final slug = sellerDoc.data()?['slug'] as String?;
-    if (slug != null && slug.isNotEmpty && slug != uid) {
-      final slugMirror = await _loadAgentsDoc(slug);
-      if (slugMirror != null) profile = _mergeAgentsPriority(profile, slugMirror);
-    }
-
-    return profile;
-  }
-
-  static Future<AgentProfile?> _loadSellerFromSlugData(
-    Map<String, dynamic> slugData,
-  ) async {
-    final companyId = slugData['companyId'] as String?;
-    final sellerId = slugData['sellerId'] as String?;
-    if (companyId == null || sellerId == null) return null;
-
-    final sellerDoc = await _getDoc(
-      _db
-          .collection('companies')
-          .doc(companyId)
-          .collection('sellers')
-          .doc(sellerId),
-    );
-    if (!sellerDoc.exists || sellerDoc.data() == null) return null;
     final data = sellerDoc.data()!;
-    final slug = data['slug'] as String? ?? sellerId;
-    debugPrint(
-      '[HitLook:Agent] seller doc displayName=${data['displayName']} '
-      'userId=${data['userId']} photoUrl=${data['photoUrl']}',
-    );
-    return AgentProfile.fromSeller(
-      slug,
+    final profile = AgentProfile.fromSeller(
+      data['slug'] as String? ?? sellerId,
       data,
       companyId: companyId,
       sellerId: sellerId,
     );
+
+    debugPrint(
+      '[HitLook:Agent] PASSO 1 OK displayName="${profile.displayName}" '
+      'userId=${profile.userId} photoUrl=${profile.fotoUrl.isNotEmpty}',
+    );
+    return profile;
   }
 
-  /// [agents] doc (uid or slug mirror) overrides empty seller name/photo.
-  static AgentProfile _mergeAgentsPriority(
+  /// PASSO 2: `agents/{uid}` — overrides de foto e nome.
+  static Future<AgentProfile?> _step2LoadAgentsUid(String uid) async {
+    debugPrint('[HitLook:Agent] PASSO 2 agents/$uid');
+    final doc = await _readAgentsDoc(uid);
+    if (doc == null) {
+      debugPrint('[HitLook:Agent] PASSO 2 doc ausente');
+      return null;
+    }
+    debugPrint(
+      '[HitLook:Agent] PASSO 2 OK nome="${doc.nome}" fotoUrl=${doc.fotoUrl.isNotEmpty}',
+    );
+    return doc;
+  }
+
+  /// PASSO 3: merge seller + legacy; `id` = slug da URL.
+  static AgentProfile _step3Merge(
+    String slug,
     AgentProfile seller,
-    AgentProfile agents,
+    AgentProfile? legacy,
   ) {
+    debugPrint('[HitLook:Agent] PASSO 3 merge');
+
+    final nome = _firstNonEmptyName([
+      legacy?.nome,
+      legacy?.displayName,
+      seller.nome,
+      seller.displayName,
+      formatSlugAsDisplayName(slug),
+    ]);
+
+    final fotoUrl = _firstNonEmpty([
+      legacy?.fotoUrl,
+      seller.fotoUrl,
+    ]);
+
+    final whatsapp = _firstNonEmpty([
+      legacy?.whatsapp,
+      seller.whatsapp,
+    ]);
+
     return AgentProfile(
-      id: seller.id,
-      nome: _pickNomeFromProfiles(agents, seller),
-      displayName: _pickString(agents.displayName, seller.displayName) ??
-          _pickNomeFromProfiles(agents, seller),
-      bio: _pickNonEmpty(agents.bio, seller.bio),
-      whatsapp: _pickNonEmpty(agents.whatsapp, seller.whatsapp),
-      fotoUrl: _pickNonEmpty(agents.fotoUrl, seller.fotoUrl),
-      idioma: agents.idioma.isNotEmpty ? agents.idioma : seller.idioma,
-      nicho: agents.nicho.isNotEmpty ? agents.nicho : seller.nicho,
-      userId: _pickString(agents.userId, seller.userId),
-      companyId: _pickString(seller.companyId, agents.companyId),
-      sellerId: _pickString(seller.sellerId, agents.sellerId),
+      id: slug,
+      nome: nome,
+      displayName: seller.displayName ?? legacy?.displayName ?? nome,
+      bio: _firstNonEmpty([legacy?.bio, seller.bio]),
+      whatsapp: whatsapp,
+      fotoUrl: fotoUrl,
+      idioma: legacy?.idioma.isNotEmpty == true ? legacy!.idioma : seller.idioma,
+      nicho: legacy?.nicho.isNotEmpty == true ? legacy!.nicho : seller.nicho,
+      userId: _firstNonEmptyString([seller.userId, legacy?.userId]),
+      companyId: seller.companyId,
+      sellerId: seller.sellerId,
     );
   }
 
-  static String _pickNomeFromProfiles(AgentProfile a, AgentProfile b) {
-    for (final candidate in [
-      a.nome,
-      a.displayName,
-      b.nome,
-      b.displayName,
-    ]) {
-      final t = candidate?.trim() ?? '';
-      if (!_isDefaultNome(t)) return t;
+  // ─── UID na URL ───────────────────────────────────────────
+
+  static Future<AgentProfile> _loadByAuthUid(String uid) async {
+    debugPrint('[HitLook:Agent] ▶ loadAgent(uid) $uid');
+
+    final legacy = await _step2LoadAgentsUid(uid);
+    final slug =
+        (await _db.collection('agents').doc(uid).get()).data()?['slug'] as String?;
+
+    if (slug != null && slug.isNotEmpty && isPublicSlug(slug)) {
+      return _loadPublicBySlug(slug);
+    }
+
+    if (legacy != null && _hasRealData(legacy)) {
+      debugPrint('[HitLook:Agent] ■ OK uid nome="${legacy.nome}"');
+      return legacy;
+    }
+
+    debugPrint('[HitLook:Agent] ■ uid sem dados — perfil vazio');
+    return AgentProfile(
+      id: uid,
+      nome: '',
+      bio: '',
+      whatsapp: '',
+      fotoUrl: '',
+      idioma: 'pt',
+      nicho: 'seguro',
+      userId: uid,
+    );
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────
+
+  static Future<AgentProfile?> _readAgentsDoc(String id) async {
+    final snap = await _db.collection('agents').doc(id).get();
+    if (!snap.exists || snap.data() == null) return null;
+    return AgentProfile.fromMap(id, snap.data()!);
+  }
+
+  static bool _hasRealData(AgentProfile p) =>
+      p.fotoUrl.trim().isNotEmpty ||
+      p.resolvedNome.isNotEmpty && p.resolvedNome != _brandNome ||
+      (p.userId != null && p.userId!.isNotEmpty && p.hasSaaSContext);
+
+  static AgentProfile _attachPublicSlug(AgentProfile p, String slug) {
+    final nome = _firstNonEmptyName([p.nome, p.displayName, formatSlugAsDisplayName(slug)]);
+    return AgentProfile(
+      id: slug,
+      nome: nome,
+      displayName: p.displayName ?? nome,
+      bio: p.bio,
+      whatsapp: p.whatsapp,
+      fotoUrl: p.fotoUrl,
+      idioma: p.idioma,
+      nicho: p.nicho,
+      userId: p.userId,
+      companyId: p.companyId,
+      sellerId: p.sellerId,
+    );
+  }
+
+  /// Fallback documentado: só slug, sem Firestore (nunca M4LIFE USA).
+  static AgentProfile _profileFromSlugOnly(String slug) {
+    final nome = formatSlugAsDisplayName(slug);
+    return AgentProfile(
+      id: slug,
+      nome: nome,
+      displayName: nome,
+      bio: '',
+      whatsapp: '',
+      fotoUrl: '',
+      idioma: 'pt',
+      nicho: 'seguro',
+    );
+  }
+
+  static String _firstNonEmpty(List<String> values) {
+    for (final v in values) {
+      final t = v.trim();
+      if (t.isNotEmpty) return t;
     }
     return '';
   }
 
-  static String _pickNonEmpty(String a, String b) {
-    if (a.trim().isNotEmpty) return a.trim();
-    return b.trim();
-  }
-
-  static AgentProfile _merge(AgentProfile primary, AgentProfile legacy) {
-    final nome = _pickNomeFromProfiles(primary, legacy);
-    return AgentProfile(
-      id: primary.id,
-      nome: nome,
-      displayName: _pickString(primary.displayName, legacy.displayName) ??
-          (nome.isNotEmpty ? nome : null),
-      bio: primary.bio.isNotEmpty ? primary.bio : legacy.bio,
-      whatsapp:
-          primary.whatsapp.isNotEmpty ? primary.whatsapp : legacy.whatsapp,
-      fotoUrl:
-          primary.fotoUrl.isNotEmpty ? primary.fotoUrl : legacy.fotoUrl,
-      idioma: primary.idioma,
-      nicho: primary.nicho,
-      userId: primary.userId ?? legacy.userId,
-      companyId: _pickString(primary.companyId, legacy.companyId),
-      sellerId: _pickString(primary.sellerId, legacy.sellerId),
-    );
-  }
-
-  static String? _pickString(String? a, String? b) {
-    if (a != null && a.isNotEmpty) return a;
-    if (b != null && b.isNotEmpty) return b;
+  static String? _firstNonEmptyString(List<String?> values) {
+    for (final v in values) {
+      final t = v?.trim() ?? '';
+      if (t.isNotEmpty) return t;
+    }
     return null;
   }
 
-  static AgentProfile _mergeAll(List<AgentProfile> profiles) {
-    if (profiles.isEmpty) return AgentProfile.defaultProfile;
-    var result = profiles.first;
-    for (var i = 1; i < profiles.length; i++) {
-      result = _merge(result, profiles[i]);
+  static String _firstNonEmptyName(List<String?> values) {
+    for (final v in values) {
+      final t = v?.trim() ?? '';
+      if (t.isNotEmpty && t != _brandNome) return t;
     }
-    return result;
+    return '';
   }
 }
 
@@ -521,7 +421,7 @@ class AgentProvider {
 String agentInitials(String nome) {
   final words =
       nome.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
-  if (words.isEmpty) return 'M4';
+  if (words.isEmpty) return '?';
 
   final first = words[0];
   if (RegExp(r'[0-9]').hasMatch(first)) {
@@ -544,12 +444,14 @@ String formatSlugAsDisplayName(String slug) {
       .join(' ');
 }
 
-/// Resolves label for public card — never "Consultor" / company name.
+/// Label do card público — nunca "Consultor" nem "M4LIFE USA" para agente real.
 String agentPublicDisplayName(AgentProfile agent, {String? publicSlug}) {
   final slug = _effectivePublicSlug(agent, publicSlug);
 
   final resolved = agent.resolvedNome;
-  if (resolved.isNotEmpty && resolved != AgentProfile.defaultProfile.nome) {
+  if (resolved.isNotEmpty &&
+      resolved != AgentProfile.defaultProfile.nome &&
+      resolved != AgentProvider._brandNome) {
     return resolved;
   }
 
@@ -557,9 +459,13 @@ String agentPublicDisplayName(AgentProfile agent, {String? publicSlug}) {
     return formatSlugAsDisplayName(slug);
   }
 
+  if (agent.nome.trim().isNotEmpty && agent.nome.trim() != AgentProvider._brandNome) {
+    return agent.nome.trim();
+  }
+
   debugPrint(
-    '[HitLook:Agent] agentPublicDisplayName fallback Agente '
-    '(nome="${agent.nome}" id=${agent.id} routeSlug=$publicSlug)',
+    '[HitLook:Agent] displayName fallback vazio '
+    '(id=${agent.id} routeSlug=$publicSlug)',
   );
   return 'Agente';
 }
