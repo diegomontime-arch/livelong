@@ -53,8 +53,8 @@ bool isNetworkError(Object e) {
 bool isRealPublicAgent(AgentProfile profile, String agentId) {
   if (agentId.isEmpty || agentId == 'default') return true;
   if (profile.fotoUrl.trim().isNotEmpty) return true;
-  if (profile.nome.isNotEmpty &&
-      profile.nome != AgentProfile.defaultProfile.nome) {
+  final name = profile.resolvedNome;
+  if (name.isNotEmpty && name != AgentProfile.defaultProfile.nome) {
     return true;
   }
   return profile.userId != null &&

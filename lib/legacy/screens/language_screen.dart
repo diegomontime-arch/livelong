@@ -741,6 +741,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       }
 
       final notFound = !isRealPublicAgent(agent, widget.agentId);
+      debugPrint(
+        '[HitLook:Agent] WelcomeScreen agentId=${widget.agentId} '
+        'nome="${agent.nome}" resolved="${agent.resolvedNome}" '
+        'foto=${agent.fotoUrl.isNotEmpty} userId=${agent.userId} notFound=$notFound',
+      );
       setState(() {
         _agent = agent;
         _agentNotFound = notFound;
@@ -871,7 +876,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     // Card do agente
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 0),
-                      child: AgentCard(agent: _agent),
+                      child: AgentCard(
+                        agent: _agent,
+                        publicSlug: widget.agentId,
+                      ),
                     ),
 
                     const SizedBox(height: 24),

@@ -14,6 +14,7 @@ class AgentProfile {
   final String fotoUrl;
   final String idioma;
   final String nicho;
+  final String? displayName;
   final String? userId;
   final String? companyId;
   final String? sellerId;
@@ -26,10 +27,20 @@ class AgentProfile {
     required this.fotoUrl,
     required this.idioma,
     required this.nicho,
+    this.displayName,
     this.userId,
     this.companyId,
     this.sellerId,
   });
+
+  /// Best label for UI — never company branding.
+  String get resolvedNome {
+    final n = nome.trim();
+    if (n.isNotEmpty && n != AgentProfile.defaultProfile.nome) return n;
+    final d = displayName?.trim() ?? '';
+    if (d.isNotEmpty) return d;
+    return n;
+  }
 
   bool get hasSaaSContext =>
       companyId != null &&
@@ -38,9 +49,12 @@ class AgentProfile {
       sellerId!.isNotEmpty;
 
   factory AgentProfile.fromMap(String id, Map<String, dynamic> map) {
+    final display = map['displayName'] as String?;
+    final nome = map['nome'] as String? ?? display ?? '';
     return AgentProfile(
       id: id,
-      nome: map['nome'] as String? ?? map['displayName'] as String? ?? '',
+      nome: nome,
+      displayName: display ?? (nome.isNotEmpty ? nome : null),
       bio: map['bio'] as String? ?? '',
       whatsapp: map['whatsapp'] as String? ??
           map['phone'] as String? ??
@@ -60,14 +74,18 @@ class AgentProfile {
     String? companyId,
     String? sellerId,
   }) {
+    final display = seller['displayName'] as String?;
+    final nome =
+        display ?? seller['nome'] as String? ?? '';
     return AgentProfile(
       id: slug,
-      nome: seller['displayName'] as String? ?? '',
+      nome: nome,
+      displayName: display ?? (nome.isNotEmpty ? nome : null),
       bio: seller['bio'] as String? ?? '',
       whatsapp: seller['phone'] as String? ??
           seller['whatsapp'] as String? ??
           '',
-      fotoUrl: seller['photoUrl'] as String? ?? '',
+      fotoUrl: seller['photoUrl'] as String? ?? seller['fotoUrl'] as String? ?? '',
       idioma: seller['idioma'] as String? ?? 'pt',
       nicho: seller['nicho'] as String? ?? 'seguro',
       userId: seller['userId'] as String?,
@@ -258,11 +276,32 @@ class AgentProvider {
     );
     if (slugMirror != null) profile = _mergeAgentsPriority(profile, slugMirror);
 
+    profile = _withPublicSlugContext(profile, slug);
+
     debugPrint(
       '[HitLook:Agent] (5/5) RESULT slug=$slug nome="${profile.nome}" '
-      'foto=${profile.fotoUrl.isNotEmpty} userId=${profile.userId}',
+      'resolved="${profile.resolvedNome}" foto=${profile.fotoUrl.isNotEmpty} '
+      'userId=${profile.userId} cardId=${profile.id}',
     );
     return profile;
+  }
+
+  /// Public /a/{slug} pages always use slug as card id and a resolved agent name.
+  static AgentProfile _withPublicSlugContext(AgentProfile profile, String slug) {
+    final nome = profile.resolvedNome;
+    return AgentProfile(
+      id: slug,
+      nome: nome,
+      displayName: profile.displayName ?? (nome.isNotEmpty ? nome : null),
+      bio: profile.bio,
+      whatsapp: profile.whatsapp,
+      fotoUrl: profile.fotoUrl,
+      idioma: profile.idioma,
+      nicho: profile.nicho,
+      userId: profile.userId,
+      companyId: profile.companyId,
+      sellerId: profile.sellerId,
+    );
   }
 
   static AgentProfile _finalizeProfile(AgentProfile profile, String agentId) {
@@ -282,7 +321,10 @@ class AgentProvider {
 
   static bool _hasPublicIdentity(AgentProfile profile) {
     if (profile.fotoUrl.trim().isNotEmpty) return true;
-    if (!_isDefaultNome(profile.nome)) return true;
+    if (profile.resolvedNome.isNotEmpty &&
+        !_isDefaultNome(profile.resolvedNome)) {
+      return true;
+    }
     return profile.userId != null &&
         profile.userId!.isNotEmpty &&
         profile.hasSaaSContext;
@@ -395,7 +437,9 @@ class AgentProvider {
   ) {
     return AgentProfile(
       id: seller.id,
-      nome: _pickNome(agents.nome, seller.nome),
+      nome: _pickNomeFromProfiles(agents, seller),
+      displayName: _pickString(agents.displayName, seller.displayName) ??
+          _pickNomeFromProfiles(agents, seller),
       bio: _pickNonEmpty(agents.bio, seller.bio),
       whatsapp: _pickNonEmpty(agents.whatsapp, seller.whatsapp),
       fotoUrl: _pickNonEmpty(agents.fotoUrl, seller.fotoUrl),
@@ -407,10 +451,17 @@ class AgentProvider {
     );
   }
 
-  static String _pickNome(String preferred, String fallback) {
-    if (!_isDefaultNome(preferred)) return preferred;
-    if (!_isDefaultNome(fallback)) return fallback;
-    return preferred.isNotEmpty ? preferred : fallback;
+  static String _pickNomeFromProfiles(AgentProfile a, AgentProfile b) {
+    for (final candidate in [
+      a.nome,
+      a.displayName,
+      b.nome,
+      b.displayName,
+    ]) {
+      final t = candidate?.trim() ?? '';
+      if (!_isDefaultNome(t)) return t;
+    }
+    return '';
   }
 
   static String _pickNonEmpty(String a, String b) {
@@ -419,11 +470,12 @@ class AgentProvider {
   }
 
   static AgentProfile _merge(AgentProfile primary, AgentProfile legacy) {
+    final nome = _pickNomeFromProfiles(primary, legacy);
     return AgentProfile(
       id: primary.id,
-      nome: !_isDefaultNome(primary.nome)
-          ? primary.nome
-          : (!_isDefaultNome(legacy.nome) ? legacy.nome : primary.nome),
+      nome: nome,
+      displayName: _pickString(primary.displayName, legacy.displayName) ??
+          (nome.isNotEmpty ? nome : null),
       bio: primary.bio.isNotEmpty ? primary.bio : legacy.bio,
       whatsapp:
           primary.whatsapp.isNotEmpty ? primary.whatsapp : legacy.whatsapp,
@@ -471,28 +523,42 @@ String agentInitials(String nome) {
   return words.take(2).map((w) => w[0].toUpperCase()).join();
 }
 
+String _formatSlugAsDisplayName(String slug) {
+  return slug
+      .split('-')
+      .where((w) => w.isNotEmpty)
+      .map((w) => w[0].toUpperCase() + w.substring(1))
+      .join(' ');
+}
+
 /// Display name on public pages — agent only, never company branding.
-String agentPublicDisplayName(AgentProfile agent, {String? slugHint}) {
-  final nome = agent.nome.trim();
-  if (nome.isNotEmpty && nome != AgentProfile.defaultProfile.nome) {
-    return nome;
+String agentPublicDisplayName(AgentProfile agent, {String? publicSlug}) {
+  final resolved = agent.resolvedNome;
+  if (resolved.isNotEmpty && resolved != AgentProfile.defaultProfile.nome) {
+    return resolved;
   }
-  final slug = (slugHint ?? agent.id).trim();
-  if (slug.isNotEmpty && slug != 'default' && !AgentProvider.looksLikeFirebaseUid(slug)) {
-    return slug
-        .split('-')
-        .where((w) => w.isNotEmpty)
-        .map((w) => w[0].toUpperCase() + w.substring(1))
-        .join(' ');
+
+  final slug = (publicSlug ?? agent.id).trim();
+  if (slug.isNotEmpty &&
+      slug != 'default' &&
+      !AgentProvider.looksLikeFirebaseUid(slug)) {
+    return _formatSlugAsDisplayName(slug);
   }
+
+  debugPrint(
+    '[HitLook:Agent] agentPublicDisplayName fallback Consultor '
+    '(nome="${agent.nome}" displayName=${agent.displayName} id=${agent.id} slug=$publicSlug)',
+  );
   return 'Consultor';
 }
 
 // ─── CARD DO AGENTE NA PÁGINA DO CLIENTE ─────────────────
 class AgentCard extends StatelessWidget {
   final AgentProfile agent;
+  /// URL slug from `/a/:slug` — used when [agent.id] is a Firebase UID.
+  final String? publicSlug;
 
-  const AgentCard({super.key, required this.agent});
+  const AgentCard({super.key, required this.agent, this.publicSlug});
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +572,7 @@ class AgentCard extends StatelessWidget {
       child: Row(
         children: [
           AgentProfilePhoto(
-            displayName: agentPublicDisplayName(agent),
+            displayName: agentPublicDisplayName(agent, publicSlug: publicSlug),
             storageUid: agent.userId,
             photoUrl: agent.fotoUrl.isNotEmpty ? agent.fotoUrl : null,
             size: 56,
@@ -517,7 +583,7 @@ class AgentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  agentPublicDisplayName(agent),
+                  agentPublicDisplayName(agent, publicSlug: publicSlug),
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
