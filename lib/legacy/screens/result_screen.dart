@@ -299,29 +299,32 @@ class _ResultScreenState extends State<ResultScreen>
     if (mounted) setState(() => _chatLoading = false);
   }
 
-  Future<void> _abrirWhatsApp() async {
+  /// Sync tap handler — no [setState] before launch (iOS Safari exige gesto do usuário).
+  void _abrirWhatsApp() {
     if (_whatsAppLoading) return;
 
-    setState(() => _whatsAppLoading = true);
-    try {
-      final phone = _consultantPhone.trim().isNotEmpty
-          ? _consultantPhone
-          : kDefaultConsultantWhatsApp;
+    final phone = _consultantPhone.trim().isNotEmpty
+        ? _consultantPhone
+        : kDefaultConsultantWhatsApp;
 
-      if (normalizeWhatsAppNumber(phone).isEmpty) {
-        _mostrarErroWhatsApp();
-        return;
-      }
-
-      final msg = buildLeadWhatsAppMessage(lang: widget.lang, score: _score);
-      // No await before launchUrl — keeps user-gesture chain on Flutter Web.
-      final opened = await openWhatsApp(phone: phone, message: msg);
-      if (!opened) _mostrarErroWhatsApp();
-    } catch (_) {
+    if (normalizeWhatsAppNumber(phone).isEmpty) {
       _mostrarErroWhatsApp();
-    } finally {
-      if (mounted) setState(() => _whatsAppLoading = false);
+      return;
     }
+
+    final msg = buildLeadWhatsAppMessage(lang: widget.lang, score: _score);
+
+    // Dispara launchUrl antes de setState (gesto do usuário no iOS Safari).
+    final openedFuture = openWhatsApp(phone: phone, message: msg);
+    setState(() => _whatsAppLoading = true);
+
+    openedFuture.then((opened) {
+      if (!opened && mounted) _mostrarErroWhatsApp();
+    }).catchError((_) {
+      if (mounted) _mostrarErroWhatsApp();
+    }).whenComplete(() {
+      if (mounted) setState(() => _whatsAppLoading = false);
+    });
   }
 
   void _mostrarErroWhatsApp() {
