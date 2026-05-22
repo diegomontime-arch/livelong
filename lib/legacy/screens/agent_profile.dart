@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
@@ -288,11 +289,14 @@ class AgentProvider {
 
   /// Public /a/{slug} pages always use slug as card id and a resolved agent name.
   static AgentProfile _withPublicSlugContext(AgentProfile profile, String slug) {
-    final nome = profile.resolvedNome;
+    final resolved = profile.resolvedNome;
+    final nome = resolved.isNotEmpty
+        ? resolved
+        : formatSlugAsDisplayName(slug);
     return AgentProfile(
       id: slug,
       nome: nome,
-      displayName: profile.displayName ?? (nome.isNotEmpty ? nome : null),
+      displayName: profile.displayName ?? nome,
       bio: profile.bio,
       whatsapp: profile.whatsapp,
       fotoUrl: profile.fotoUrl,
@@ -305,13 +309,26 @@ class AgentProvider {
   }
 
   static AgentProfile _finalizeProfile(AgentProfile profile, String agentId) {
+    final isPublicSlug = agentId.isNotEmpty &&
+        agentId != 'default' &&
+        !looksLikeFirebaseUid(agentId);
+
     if (_hasPublicIdentity(profile)) {
+      final out = isPublicSlug ? _withPublicSlugContext(profile, agentId) : profile;
       debugPrint(
-        '[HitLook:Agent] ✓ finalize OK id=$agentId nome="${profile.nome}" '
-        'foto=${profile.fotoUrl.isNotEmpty} userId=${profile.userId}',
+        '[HitLook:Agent] ✓ finalize OK id=$agentId nome="${out.nome}" '
+        'foto=${out.fotoUrl.isNotEmpty} userId=${out.userId}',
       );
-      return profile;
+      return out;
     }
+
+    if (isPublicSlug) {
+      debugPrint(
+        '[HitLook:Agent] finalize minimal slug=$agentId (firestore partial)',
+      );
+      return _withPublicSlugContext(profile, agentId);
+    }
+
     debugPrint(
       '[HitLook:Agent] ✗ finalize DEFAULT id=$agentId '
       '(nome="${profile.nome}" userId=${profile.userId})',
@@ -336,12 +353,7 @@ class AgentProvider {
   static Future<DocumentSnapshot<Map<String, dynamic>>> _getDoc(
     DocumentReference<Map<String, dynamic>> ref,
   ) async {
-    try {
-      return await ref.get(const GetOptions(source: Source.server));
-    } catch (e) {
-      debugPrint('[HitLook:Agent] server read fallback ${ref.path}: $e');
-      return await ref.get();
-    }
+    return ref.get();
   }
 
   static Future<AgentProfile?> _loadAgentsDoc(String id) async {
@@ -523,7 +535,8 @@ String agentInitials(String nome) {
   return words.take(2).map((w) => w[0].toUpperCase()).join();
 }
 
-String _formatSlugAsDisplayName(String slug) {
+/// "diego-teste" → "Diego Teste"
+String formatSlugAsDisplayName(String slug) {
   return slug
       .split('-')
       .where((w) => w.isNotEmpty)
@@ -531,25 +544,34 @@ String _formatSlugAsDisplayName(String slug) {
       .join(' ');
 }
 
-/// Display name on public pages — agent only, never company branding.
+/// Resolves label for public card — never "Consultor" / company name.
 String agentPublicDisplayName(AgentProfile agent, {String? publicSlug}) {
+  final slug = _effectivePublicSlug(agent, publicSlug);
+
   final resolved = agent.resolvedNome;
   if (resolved.isNotEmpty && resolved != AgentProfile.defaultProfile.nome) {
     return resolved;
   }
 
-  final slug = (publicSlug ?? agent.id).trim();
-  if (slug.isNotEmpty &&
-      slug != 'default' &&
-      !AgentProvider.looksLikeFirebaseUid(slug)) {
-    return _formatSlugAsDisplayName(slug);
+  if (slug != null) {
+    return formatSlugAsDisplayName(slug);
   }
 
   debugPrint(
-    '[HitLook:Agent] agentPublicDisplayName fallback Consultor '
-    '(nome="${agent.nome}" displayName=${agent.displayName} id=${agent.id} slug=$publicSlug)',
+    '[HitLook:Agent] agentPublicDisplayName fallback Agente '
+    '(nome="${agent.nome}" id=${agent.id} routeSlug=$publicSlug)',
   );
-  return 'Consultor';
+  return 'Agente';
+}
+
+String? _effectivePublicSlug(AgentProfile agent, String? publicSlug) {
+  for (final candidate in [publicSlug, agent.id]) {
+    final s = candidate?.trim() ?? '';
+    if (s.isEmpty || s == 'default') continue;
+    if (AgentProvider.looksLikeFirebaseUid(s)) continue;
+    return s;
+  }
+  return null;
 }
 
 // ─── CARD DO AGENTE NA PÁGINA DO CLIENTE ─────────────────
@@ -560,8 +582,17 @@ class AgentCard extends StatelessWidget {
 
   const AgentCard({super.key, required this.agent, this.publicSlug});
 
+  String? _slugFromRoute(BuildContext context) {
+    final fromRoute = GoRouterState.of(context).pathParameters['sellerSlug'];
+    if (fromRoute != null && fromRoute.isNotEmpty) return fromRoute;
+    return publicSlug;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final routeSlug = _slugFromRoute(context);
+    final displayName = agentPublicDisplayName(agent, publicSlug: routeSlug);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -572,7 +603,7 @@ class AgentCard extends StatelessWidget {
       child: Row(
         children: [
           AgentProfilePhoto(
-            displayName: agentPublicDisplayName(agent, publicSlug: publicSlug),
+            displayName: displayName,
             storageUid: agent.userId,
             photoUrl: agent.fotoUrl.isNotEmpty ? agent.fotoUrl : null,
             size: 56,
@@ -583,7 +614,7 @@ class AgentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  agentPublicDisplayName(agent, publicSlug: publicSlug),
+                  displayName,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,

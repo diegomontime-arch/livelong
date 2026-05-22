@@ -722,23 +722,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     try {
-      final agent = await runWithTimeout(
-        () => AgentProvider.loadAgent(widget.agentId),
-      );
+      final agent = await AgentProvider.loadAgent(widget.agentId);
 
       if (!mounted) return;
-
-      if (agent == null) {
-        setState(() {
-          _loadError = widget.lang == 'en'
-              ? 'Loading took too long. Check your connection and try again.'
-              : widget.lang == 'es'
-                  ? 'La carga tardó demasiado. Verifica tu conexión.'
-                  : 'Demorou demais para carregar. Verifique sua conexão.';
-          _loadingAgent = false;
-        });
-        return;
-      }
 
       final notFound = !isRealPublicAgent(agent, widget.agentId);
       debugPrint(
