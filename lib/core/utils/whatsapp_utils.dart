@@ -8,20 +8,39 @@ import 'package:hitlook/core/utils/whatsapp_launcher_stub.dart'
 /// Default consultant WhatsApp (Renan) when agent profile has no number.
 const kDefaultConsultantWhatsApp = '17869738628';
 
-/// Normalizes a phone number for wa.me (digits only; US 10-digit → prepend 1).
-String normalizeWhatsAppNumber(String raw) {
-  final digits = raw.replaceAll(RegExp(r'[^0-9]'), '');
-  if (digits.isEmpty) return '';
+/// Formats phone for wa.me — always includes country code.
+String formatWhatsAppNumber(String raw) {
+  final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
+  if (digits.isEmpty) return kDefaultConsultantWhatsApp;
+
+  // Já tem código EUA (11+ dígitos começando com 1)
+  if (digits.length >= 11 && digits.startsWith('1')) return digits;
+
+  // 10 dígitos → EUA
   if (digits.length == 10) return '1$digits';
+
+  // 11 dígitos começando com 0 → Brasil (remove 0, adiciona 55)
+  if (digits.length == 11 && digits.startsWith('0')) {
+    return '55${digits.substring(1)}';
+  }
+
+  // 11 dígitos sem código → Brasil
+  if (digits.length == 11) return '55$digits';
+
   return digits;
+}
+
+/// Returns formatted number or empty if [raw] is blank (for validation).
+String normalizeWhatsAppNumber(String raw) {
+  if (raw.trim().isEmpty) return '';
+  return formatWhatsAppNumber(raw);
 }
 
 /// Builds the wa.me URI (https://wa.me/NUM?text=...).
 Uri buildWhatsAppUri({required String phone, required String message}) {
-  final numero = normalizeWhatsAppNumber(phone);
-  if (numero.isEmpty) {
-    throw ArgumentError('Invalid WhatsApp phone: $phone');
-  }
+  final numero = phone.trim().isEmpty
+      ? kDefaultConsultantWhatsApp
+      : formatWhatsAppNumber(phone);
   return Uri.parse(
     'https://wa.me/$numero?text=${Uri.encodeComponent(message)}',
   );

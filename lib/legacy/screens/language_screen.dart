@@ -1112,7 +1112,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'title': 'ANTES DE COMEÇAR',
       'desc': 'Precisamos de algumas informações para personalizar seu resultado.',
       'name': 'Nome completo', 'name_h': 'Como você se chama?',
-      'phone': 'Telefone / WhatsApp', 'phone_h': '(305) 000-0000',
+      'phone': 'Telefone / WhatsApp', 'phone_h': '+1 (305) 555-1234',
+      'phone_help': 'Inclua o código do país. Ex: +1 para EUA, +55 para Brasil',
       'birth': 'Data de nascimento', 'birth_h': 'MM/DD/AAAA',
       'privacy': 'Suas informações são confidenciais e nunca serão compartilhadas sem sua autorização.',
       'btn': 'CONTINUAR',
@@ -1125,7 +1126,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'title': 'ANTES DE EMPEZAR',
       'desc': 'Necesitamos algunos datos para personalizar tu resultado.',
       'name': 'Nombre completo', 'name_h': '¿Cómo te llamas?',
-      'phone': 'Teléfono / WhatsApp', 'phone_h': '(305) 000-0000',
+      'phone': 'Teléfono / WhatsApp', 'phone_h': '+1 (305) 555-1234',
+      'phone_help': 'Incluye el código de país. Ej: +1 para EE.UU., +55 para Brasil',
       'birth': 'Fecha de nacimiento', 'birth_h': 'MM/DD/AAAA',
       'privacy': 'Tu información es confidencial y nunca será compartida sin tu autorización.',
       'btn': 'CONTINUAR',
@@ -1138,7 +1140,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'title': 'BEFORE WE START',
       'desc': 'We need some basic information to personalize your result.',
       'name': 'Full name', 'name_h': 'What is your name?',
-      'phone': 'Phone / WhatsApp', 'phone_h': '(305) 000-0000',
+      'phone': 'Phone / WhatsApp', 'phone_h': '+1 (305) 555-1234',
+      'phone_help': 'Include country code. Ex: +1 for US, +55 for Brazil',
       'birth': 'Date of birth', 'birth_h': 'MM/DD/YYYY',
       'privacy': 'Your information is confidential and will never be shared without your authorization.',
       'btn': 'CONTINUE',
@@ -1259,6 +1262,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       ctrl: _telCtrl,
                       label: _t('phone'),
                       hint: _t('phone_h'),
+                      helpText: _t('phone_help'),
                       icon: Icons.phone_outlined,
                       tipo: TextInputType.phone,
                       erro: _t('e_phone'),
@@ -1350,6 +1354,7 @@ class _Campo extends StatelessWidget {
   final List<TextInputFormatter>? inputFormatters;
   final int? minLength;
   final String? lengthErro;
+  final String? helpText;
 
   const _Campo({
     required this.ctrl,
@@ -1361,6 +1366,7 @@ class _Campo extends StatelessWidget {
     this.inputFormatters,
     this.minLength,
     this.lengthErro,
+    this.helpText,
   });
 
   @override
@@ -1426,6 +1432,17 @@ class _Campo extends StatelessWidget {
                 horizontal: 16, vertical: 14),
           ),
         ),
+        if (helpText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            helpText!,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.grey.withOpacity(0.9),
+              height: 1.35,
+            ),
+          ),
+        ],
       ],
     );
   }

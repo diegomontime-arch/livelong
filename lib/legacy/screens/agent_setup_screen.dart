@@ -598,9 +598,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                         _Campo(
                           ctrl: _whatsappCtrl,
                           label: 'WHATSAPP',
-                          hint: '13051234567 (só números)',
+                          hint: '+1 (786) 555-1234',
                           icon: Icons.chat_outlined,
                           tipo: TextInputType.phone,
+                          helpText:
+                              'Inclua o código do país. Ex: +1 para EUA, +55 para Brasil',
                           validator: (v) => v == null || v.trim().isEmpty
                               ? 'Digite seu WhatsApp'
                               : null,
@@ -891,6 +893,7 @@ class _Campo extends StatelessWidget {
   final String? Function(String?)? validator;
   final bool obscure;
   final VoidCallback? onToggleObscure;
+  final String? helpText;
 
   const _Campo({
     required this.ctrl,
@@ -901,6 +904,7 @@ class _Campo extends StatelessWidget {
     this.validator,
     this.obscure = false,
     this.onToggleObscure,
+    this.helpText,
   });
 
   @override
@@ -969,6 +973,17 @@ class _Campo extends StatelessWidget {
                 horizontal: 16, vertical: 14),
           ),
         ),
+        if (helpText != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            helpText!,
+            style: TextStyle(
+              fontSize: 11,
+              color: AppColors.grey.withOpacity(0.9),
+              height: 1.35,
+            ),
+          ),
+        ],
       ],
     );
   }
