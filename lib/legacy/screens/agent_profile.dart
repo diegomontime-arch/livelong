@@ -51,6 +51,7 @@ class AgentProfile {
   factory AgentProfile.fromMap(String id, Map<String, dynamic> map) {
     final display = map['displayName'] as String?;
     final nome = map['nome'] as String? ?? display ?? '';
+    final fotoUrl = AgentPhotoPersistence.readUrlFromAgentMap(map) ?? '';
     return AgentProfile(
       id: id,
       nome: nome,
@@ -59,7 +60,7 @@ class AgentProfile {
       whatsapp: map['whatsapp'] as String? ??
           map['phone'] as String? ??
           '',
-      fotoUrl: map['fotoUrl'] as String? ?? map['photoUrl'] as String? ?? '',
+      fotoUrl: fotoUrl,
       idioma: map['idioma'] as String? ?? 'pt',
       nicho: map['nicho'] as String? ?? 'seguro',
       userId: map['userId'] as String?,
@@ -77,6 +78,7 @@ class AgentProfile {
     final display = seller['displayName'] as String?;
     final nome =
         display ?? seller['nome'] as String? ?? '';
+    final fotoUrl = AgentPhotoPersistence.readUrlFromAgentMap(seller) ?? '';
     return AgentProfile(
       id: slug,
       nome: nome,
@@ -85,7 +87,7 @@ class AgentProfile {
       whatsapp: seller['phone'] as String? ??
           seller['whatsapp'] as String? ??
           '',
-      fotoUrl: seller['photoUrl'] as String? ?? seller['fotoUrl'] as String? ?? '',
+      fotoUrl: fotoUrl,
       idioma: seller['idioma'] as String? ?? 'pt',
       nicho: seller['nicho'] as String? ?? 'seguro',
       userId: seller['userId'] as String?,
@@ -163,6 +165,7 @@ class AgentProvider {
 
   /// Carrega perfil para `/a/{slug}` ou `/a/{uid}`.
   static Future<AgentProfile> loadAgent(String agentId) async {
+    debugPrint('[Photo] step 1: slug=$agentId');
     if (agentId.isEmpty || agentId == 'default') {
       debugPrint('[HitLook:Agent] loadAgent → rota / (default)');
       return AgentProfile.defaultProfile;
@@ -202,8 +205,12 @@ class AgentProvider {
     // PASSO 2 — agents/{userId} + espelho agents/{slug}
     AgentProfile? legacy;
     final uid = seller.userId?.trim() ?? '';
+    debugPrint('[Photo] step 3: userId=$uid');
     if (uid.isNotEmpty) {
       legacy = await _step2LoadAgentsUid(uid);
+      debugPrint(
+        '[Photo] step 3 agents/$uid fotoUrl=${legacy?.fotoUrl ?? "(null)"}',
+      );
     } else {
       debugPrint('[HitLook:Agent] PASSO 2 pulado — seller sem userId');
     }
@@ -211,6 +218,11 @@ class AgentProvider {
 
     // PASSO 3 — merge
     final profile = _step3Merge(slug, seller, legacy, slugMirror);
+    debugPrint('[Photo] step 4: fotoUrl=${profile.fotoUrl}');
+    debugPrint(
+      '[Photo] step 5: final profile nome=${profile.nome} foto=${profile.fotoUrl} '
+      'userId=${profile.userId}',
+    );
     debugPrint(
       '[HitLook:Agent] ■ OK slug=$slug nome="${profile.nome}" '
       'foto=${profile.fotoUrl.isNotEmpty} userId=${profile.userId}',
@@ -250,6 +262,7 @@ class AgentProvider {
     }
 
     final data = sellerDoc.data()!;
+    debugPrint('[Photo] step 2: seller=$data');
     final profile = AgentProfile.fromSeller(
       data['slug'] as String? ?? sellerId,
       data,
@@ -261,6 +274,7 @@ class AgentProvider {
       '[HitLook:Agent] PASSO 1 OK displayName="${profile.displayName}" '
       'userId=${profile.userId} photoUrl=${profile.fotoUrl.isNotEmpty}',
     );
+    debugPrint('[Photo] step 2 parsed: userId=${profile.userId} fotoUrl=${profile.fotoUrl}');
     return profile;
   }
 
@@ -297,11 +311,13 @@ class AgentProvider {
       formatSlugAsDisplayName(slug),
     ]);
 
+    // Seller é fonte da verdade (photoUrl); agents só complementa se seller vazio.
     final fotoUrl = _firstNonEmpty([
+      seller.fotoUrl,
       legacy?.fotoUrl,
       slugMirror?.fotoUrl,
-      seller.fotoUrl,
     ]);
+    debugPrint('[Photo] step 3 merge fotoUrl=$fotoUrl');
 
     final whatsapp = _firstNonEmpty([
       legacy?.whatsapp,
@@ -529,6 +545,10 @@ class AgentCard extends StatelessWidget {
     // publicSlug vem do pai (ex. WelcomeScreen.agentId) — não usar GoRouterState
     // aqui: esta tela é aberta com Navigator.push, fora de RouteBase.builder.
     final displayName = agentPublicDisplayName(agent, publicSlug: publicSlug);
+    debugPrint(
+      '[Photo] AgentCard slug=$publicSlug userId=${agent.userId} '
+      'fotoUrl=${agent.fotoUrl}',
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -540,6 +560,7 @@ class AgentCard extends StatelessWidget {
       child: Row(
         children: [
           AgentProfilePhoto(
+            key: ValueKey('${agent.userId}|${agent.fotoUrl}'),
             displayName: displayName,
             storageUid: agent.userId,
             photoUrl: agent.fotoUrl.isNotEmpty ? agent.fotoUrl : null,

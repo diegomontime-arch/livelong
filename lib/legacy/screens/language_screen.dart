@@ -744,6 +744,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
         'nome="${agent.nome}" resolved="${agent.resolvedNome}" '
         'foto=${agent.fotoUrl.isNotEmpty} userId=${agent.userId} notFound=$notFound',
       );
+      debugPrint(
+        '[Photo] WelcomeScreen → AgentCard fotoUrl=${agent.fotoUrl} userId=${agent.userId}',
+      );
       setState(() {
         _agent = agent;
         _publicSlug = publicSlug;

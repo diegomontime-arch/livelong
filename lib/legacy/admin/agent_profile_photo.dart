@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:hitlook/legacy/admin/admin_seller_avatar.dart';
 
-/// Avatar that loads agent photos via Storage SDK (avoids web CORS on [Image.network]).
+/// Avatar that loads agent photos via HTTP URL or Storage SDK (web-safe).
 class AgentProfilePhoto extends StatefulWidget {
   const AgentProfilePhoto({
     super.key,
@@ -30,6 +30,7 @@ class AgentProfilePhoto extends StatefulWidget {
 class _AgentProfilePhotoState extends State<AgentProfilePhoto> {
   Uint8List? _imageBytes;
   bool _loading = false;
+  int _loadGeneration = 0;
 
   @override
   void initState() {
@@ -52,47 +53,68 @@ class _AgentProfilePhotoState extends State<AgentProfilePhoto> {
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _imageBytes = null;
-    });
-
+    final generation = ++_loadGeneration;
     final uid = widget.storageUid?.trim() ?? '';
     final url = widget.photoUrl?.trim() ?? '';
 
+    debugPrint(
+      '[Photo] AgentProfilePhoto load uid=$uid url=${url.isNotEmpty ? url.substring(0, url.length.clamp(0, 80)) : "(empty)"}',
+    );
+
+    if (uid.isEmpty && url.isEmpty) {
+      debugPrint('[Photo] AgentProfilePhoto skip — sem uid e sem url');
+      return;
+    }
+
+    if (mounted) setState(() => _loading = true);
+
     Uint8List? bytes;
 
-    if (uid.isNotEmpty) {
+    // Web: URL primeiro (CORS no bucket); depois Storage getData.
+    if (kIsWeb && url.isNotEmpty) {
+      bytes = await _fetchUrlBytes(url);
+    }
+
+    if ((bytes == null || bytes.isEmpty) && uid.isNotEmpty) {
       try {
         final ref = FirebaseStorage.instance.ref().child('agents/$uid/photo');
         bytes = await ref.getData(AgentPhotoPersistence.maxPhotoBytes);
         debugPrint(
-          '[HitLook:Photo] storage agents/$uid/photo bytes=${bytes?.length ?? 0}',
+          '[Photo] storage agents/$uid/photo bytes=${bytes?.length ?? 0}',
         );
       } catch (e, st) {
-        debugPrint('[HitLook:Photo] storage failed: $e\n$st');
+        debugPrint('[Photo] storage failed: $e\n$st');
       }
     }
 
-    if ((bytes == null || bytes.isEmpty) && url.isNotEmpty) {
-      try {
-        final response = await http.get(Uri.parse(url));
-        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
-          bytes = response.bodyBytes;
-          debugPrint(
-            '[HitLook:Photo] url bytes=${bytes.length} (web-safe)',
-          );
-        }
-      } catch (e, st) {
-        debugPrint('[HitLook:Photo] url fetch failed: $e\n$st');
-      }
+    if ((bytes == null || bytes.isEmpty) && !kIsWeb && url.isNotEmpty) {
+      bytes = await _fetchUrlBytes(url);
     }
 
-    if (!mounted) return;
+    if (!mounted || generation != _loadGeneration) return;
+
     setState(() {
       _imageBytes = bytes;
       _loading = false;
     });
+
+    debugPrint(
+      '[Photo] AgentProfilePhoto done bytes=${bytes?.length ?? 0} loading=$_loading',
+    );
+  }
+
+  Future<Uint8List?> _fetchUrlBytes(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+        debugPrint('[Photo] url fetch OK bytes=${response.bodyBytes.length}');
+        return response.bodyBytes;
+      }
+      debugPrint('[Photo] url fetch status=${response.statusCode}');
+    } catch (e, st) {
+      debugPrint('[Photo] url fetch failed: $e\n$st');
+    }
+    return null;
   }
 
   @override
@@ -115,6 +137,25 @@ class _AgentProfilePhotoState extends State<AgentProfilePhoto> {
             height: 22,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
+        ),
+      );
+    }
+
+    final url = widget.photoUrl?.trim() ?? '';
+    if (kIsWeb && url.isNotEmpty) {
+      debugPrint('[Photo] AgentProfilePhoto fallback Image.network');
+      return _circle(
+        Image.network(
+          url,
+          fit: BoxFit.cover,
+          errorBuilder: (_, error, __) {
+            debugPrint('[Photo] Image.network error: $error');
+            return AdminSellerAvatar(
+              displayName: widget.displayName,
+              photoUrl: null,
+              size: widget.size,
+            );
+          },
         ),
       );
     }
@@ -202,9 +243,14 @@ abstract final class AgentPhotoPersistence {
     return url;
   }
 
+  /// Ignora `fotoUrl: ''` e usa `photoUrl` quando o legado gravou string vazia.
   static String? readUrlFromAgentMap(Map<String, dynamic> data) {
-    final url = data['fotoUrl'] as String? ?? data['photoUrl'] as String?;
-    final trimmed = url?.trim() ?? '';
-    return trimmed.isEmpty ? null : trimmed;
+    for (final key in ['photoUrl', 'fotoUrl']) {
+      final raw = data[key];
+      if (raw is! String) continue;
+      final trimmed = raw.trim();
+      if (trimmed.isNotEmpty) return trimmed;
+    }
+    return null;
   }
 }
