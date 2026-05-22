@@ -12,7 +12,6 @@ import 'package:hitlook/legacy/screens/hitlook_splash_screen.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: RoutePaths.root,
   redirect: authRedirect,
   routes: [
     GoRoute(
