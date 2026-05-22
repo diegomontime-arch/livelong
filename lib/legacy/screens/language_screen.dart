@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hitlook/core/utils/public_agent_slug.dart';
 import 'package:hitlook/legacy/screens/agent_login_screen.dart';
 import 'package:hitlook/legacy/screens/hitlook_splash_screen.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
@@ -410,13 +411,15 @@ class _LanguageScreenState extends State<LanguageScreen>
   late Animation<Offset> _slideUp;
   String? _selected;
   bool _splashDone = false;
+  late String _agentId;
 
   @override
   void initState() {
     super.initState();
+    _agentId = resolvePublicAgentId(widget.agentId);
     debugPrint(
-      '[Photo] LanguageScreen init agentId=${widget.agentId} '
-      '(slug preserved before splash)',
+      '[Photo] LanguageScreen init agentId=$_agentId '
+      '(route=${widget.agentId}, browser slug on web)',
     );
     _ctrl = AnimationController(
       vsync: this,
@@ -433,6 +436,24 @@ class _LanguageScreenState extends State<LanguageScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_agentId != 'default') return;
+    try {
+      final slug = resolvePublicAgentId(
+        widget.agentId,
+        routerState: GoRouterState.of(context),
+      );
+      if (slug != 'default' && slug != _agentId) {
+        _agentId = slug;
+        debugPrint('[Photo] LanguageScreen slug from GoRouter: $_agentId');
+      }
+    } catch (_) {
+      // Not under GoRouter yet.
+    }
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
     super.dispose();
@@ -445,7 +466,7 @@ class _LanguageScreenState extends State<LanguageScreen>
       Navigator.push(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => WelcomeScreen(lang: lang, agentId: widget.agentId),
+          pageBuilder: (_, __, ___) => WelcomeScreen(lang: lang, agentId: _agentId),
           transitionsBuilder: (_, anim, __, child) =>
               FadeTransition(opacity: anim, child: child),
           transitionDuration: const Duration(milliseconds: 500),
@@ -707,6 +728,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late AnimationController _ctrl;
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
+  late String _agentId;
   AgentProfile _agent = AgentProfile.defaultProfile;
   String _publicSlug = '';
   bool _loadingAgent = true;
@@ -716,6 +738,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   void initState() {
     super.initState();
+    _agentId = resolvePublicAgentId(widget.agentId);
+    debugPrint('[Photo] WelcomeScreen init agentId=$_agentId (route=${widget.agentId})');
     _loadAgent();
     _ctrl = AnimationController(
       vsync: this,
@@ -739,8 +763,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     try {
-      var loadId = widget.agentId;
-      var publicSlug = widget.agentId;
+      var loadId = _agentId;
+      var publicSlug = _agentId;
 
       if (AgentProvider.looksLikeFirebaseUid(loadId)) {
         final slug = await AgentProvider.resolvePublicLinkId(loadId);
@@ -756,7 +780,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
       final notFound = !isRealPublicAgent(agent, loadId);
       debugPrint(
-        '[HitLook:Agent] WelcomeScreen agentId=${widget.agentId} loadId=$loadId '
+        '[HitLook:Agent] WelcomeScreen agentId=$_agentId loadId=$loadId '
         'nome="${agent.nome}" resolved="${agent.resolvedNome}" '
         'foto=${agent.fotoUrl.isNotEmpty} userId=${agent.userId} notFound=$notFound',
       );
@@ -834,7 +858,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   @override
   Widget build(BuildContext context) {
     if (_agentNotFound) {
-      return AgentNotFoundScreen(lang: widget.lang, agentId: widget.agentId);
+      return AgentNotFoundScreen(lang: widget.lang, agentId: _agentId);
     }
 
     if (_loadError != null) {
@@ -896,9 +920,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 0),
                       child: AgentCard(
                         agent: _agent,
-                        publicSlug: _publicSlug.isNotEmpty
-                            ? _publicSlug
-                            : widget.agentId,
+                        publicSlug: _publicSlug.isNotEmpty ? _publicSlug : _agentId,
                       ),
                     ),
 
@@ -984,7 +1006,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             context,
                             PageRouteBuilder(
                               pageBuilder: (_, __, ___) =>
-                                  OnboardingScreen(lang: widget.lang, agentId: widget.agentId),
+                                  OnboardingScreen(lang: widget.lang, agentId: _agentId),
                               transitionsBuilder:
                                   (_, anim, __, child) =>
                                       FadeTransition(

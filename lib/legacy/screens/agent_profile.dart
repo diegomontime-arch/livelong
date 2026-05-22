@@ -170,6 +170,7 @@ class AgentProvider {
       debugPrint('[HitLook:Agent] loadAgent → rota / (default)');
       return AgentProfile.defaultProfile;
     }
+    debugPrint('[HitLook:Agent] loadAgent → /a/$agentId');
 
     try {
       if (looksLikeFirebaseUid(agentId)) {

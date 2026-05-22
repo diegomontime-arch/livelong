@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/core/routing/route_guards.dart';
+import 'package:hitlook/core/utils/public_agent_slug.dart';
 import 'package:hitlook/legacy/screens/admin_company_screen.dart';
 import 'package:hitlook/legacy/screens/admin_dashboard_screen.dart';
 import 'package:hitlook/legacy/screens/admin_seller_leads_screen.dart';
@@ -12,6 +13,7 @@ import 'package:hitlook/legacy/screens/hitlook_splash_screen.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 final GoRouter appRouter = GoRouter(
+  initialLocation: routerInitialLocation(),
   redirect: authRedirect,
   routes: [
     GoRoute(
