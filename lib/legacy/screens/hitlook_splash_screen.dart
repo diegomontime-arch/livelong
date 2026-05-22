@@ -61,13 +61,10 @@ class _HitLookSplashScreenState extends State<HitLookSplashScreen>
 
     final raw = widget.destination?.trim() ?? '/';
     final dest = Uri.parse(raw);
-    // Navega só pelo path — URL absoluta quebrava o slug no go_router web.
+    // Navega só pelo path — sem query params que corrompem o slug.
     final path = dest.path.isEmpty ? '/' : dest.path;
-    final query = Map<String, String>.from(dest.queryParameters)
-      ..['splash'] = 'done';
-    final target = Uri(path: path, queryParameters: query).toString();
-    debugPrint('[HitLook:Splash] go → $target (from raw=$raw)');
-    context.go(target);
+    debugPrint('[HitLook:Splash] go → $path (from raw=$raw)');
+    context.go(path);
   }
 
   @override
