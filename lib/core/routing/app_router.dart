@@ -19,7 +19,9 @@ final GoRouter appRouter = GoRouter(
       path: RoutePaths.splash,
       builder: (context, state) {
         final next = state.uri.queryParameters['next'] ?? RoutePaths.root;
-        return HitLookSplashScreen(destination: next);
+        // Path-only: evita perder /a/:slug ao voltar do splash legado.
+        final path = Uri.tryParse(next)?.path;
+        return HitLookSplashScreen(destination: path ?? next);
       },
     ),
     GoRoute(
@@ -30,7 +32,7 @@ final GoRouter appRouter = GoRouter(
       path: '${RoutePaths.publicSellerPrefix}/:sellerSlug',
       builder: (context, state) {
         final sellerSlug = state.pathParameters['sellerSlug'] ?? '';
-        return LanguageScreen(agentId: sellerSlug);
+        return LanguageScreen(agentId: sellerSlug.isNotEmpty ? sellerSlug : 'default');
       },
     ),
     // Login only — agent accounts are created by admin (no public /signup route).

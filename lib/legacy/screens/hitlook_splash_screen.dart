@@ -5,15 +5,22 @@ import 'package:go_router/go_router.dart';
 
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
-/// Branded splash before public lead-form routes (1.5s).
+/// Branded splash (1.5s). Visual only — must not change routes when embedded.
 class HitLookSplashScreen extends StatefulWidget {
   const HitLookSplashScreen({
     super.key,
-    required this.destination,
-  });
+    this.destination,
+    this.onFinished,
+  }) : assert(
+          destination != null || onFinished != null,
+          'Provide destination (router) or onFinished (embedded)',
+        );
 
-  /// Path to navigate to after splash (e.g. `/` or `/a/renan`).
-  final String destination;
+  /// Router mode: navigate here after splash (path only, e.g. `/a/diego-teste`).
+  final String? destination;
+
+  /// Embedded mode: callback instead of [GoRouter] navigation.
+  final VoidCallback? onFinished;
 
   @override
   State<HitLookSplashScreen> createState() => _HitLookSplashScreenState();
@@ -40,17 +47,27 @@ class _HitLookSplashScreenState extends State<HitLookSplashScreen>
     _fadeCtrl.forward();
     _progressCtrl.forward();
 
-    _timer = Timer(_duration, () {
-      if (!mounted) return;
-      final dest = Uri.parse(widget.destination);
-      final next = dest.replace(
-        queryParameters: {
-          ...dest.queryParameters,
-          'splash': 'done',
-        },
-      );
-      context.go(next.toString());
-    });
+    _timer = Timer(_duration, _finish);
+  }
+
+  void _finish() {
+    if (!mounted) return;
+
+    final onFinished = widget.onFinished;
+    if (onFinished != null) {
+      onFinished();
+      return;
+    }
+
+    final raw = widget.destination?.trim() ?? '/';
+    final dest = Uri.parse(raw);
+    // Navega só pelo path — URL absoluta quebrava o slug no go_router web.
+    final path = dest.path.isEmpty ? '/' : dest.path;
+    final query = Map<String, String>.from(dest.queryParameters)
+      ..['splash'] = 'done';
+    final target = Uri(path: path, queryParameters: query).toString();
+    debugPrint('[HitLook:Splash] go → $target (from raw=$raw)');
+    context.go(target);
   }
 
   @override

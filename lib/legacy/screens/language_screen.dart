@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/legacy/screens/agent_login_screen.dart';
+import 'package:hitlook/legacy/screens/hitlook_splash_screen.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/questions_screen.dart';
 import 'package:hitlook/legacy/widgets/flow_ux.dart';
@@ -407,10 +409,15 @@ class _LanguageScreenState extends State<LanguageScreen>
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
   String? _selected;
+  bool _splashDone = false;
 
   @override
   void initState() {
     super.initState();
+    debugPrint(
+      '[Photo] LanguageScreen init agentId=${widget.agentId} '
+      '(slug preserved before splash)',
+    );
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -449,6 +456,15 @@ class _LanguageScreenState extends State<LanguageScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (!_splashDone) {
+      return HitLookSplashScreen(
+        onFinished: () {
+          if (!mounted) return;
+          setState(() => _splashDone = true);
+        },
+      );
+    }
+
     return PublicLeadFlowScaffold(
       lang: _selected,
       child: WatermarkBackground(

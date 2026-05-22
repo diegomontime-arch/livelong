@@ -5,11 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/legacy/admin/admin_session.dart';
 
-bool _isPublicSplashPath(String path) {
-  if (path == RoutePaths.splash) return false;
-  return _isPublicClientPath(path);
-}
-
 bool _isPublicClientPath(String path) {
   if (path == RoutePaths.root) return true;
   return path.startsWith('${RoutePaths.publicSellerPrefix}/');
@@ -22,14 +17,10 @@ Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
   final mode = qp['mode'];
   final path = state.uri.path;
 
-  if (_isPublicSplashPath(path) && qp['splash'] != 'done') {
-    final next = state.uri.toString();
-    return '${RoutePaths.splash}?next=${Uri.encodeComponent(next)}';
-  }
-
   if (path == RoutePaths.splash) return null;
 
   // Public lead funnel — never redirect logged-in admins/agents away.
+  // Splash é visual dentro de [LanguageScreen] — não redirecionar para /splash.
   if (_isPublicClientPath(path)) return null;
 
   // Password-reset links must land on /login (not / or other routes).
