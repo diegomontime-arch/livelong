@@ -52,8 +52,14 @@ bool isNetworkError(Object e) {
 
 bool isRealPublicAgent(AgentProfile profile, String agentId) {
   if (agentId.isEmpty || agentId == 'default') return true;
-  return profile.nome.isNotEmpty &&
-      profile.nome != AgentProfile.defaultProfile.nome;
+  if (profile.fotoUrl.trim().isNotEmpty) return true;
+  if (profile.nome.isNotEmpty &&
+      profile.nome != AgentProfile.defaultProfile.nome) {
+    return true;
+  }
+  return profile.userId != null &&
+      profile.userId!.isNotEmpty &&
+      profile.hasSaaSContext;
 }
 
 String formatLeadDate(dynamic value, {String locale = 'pt_BR'}) {

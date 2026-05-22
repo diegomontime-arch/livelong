@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/widgets/flow_ux.dart';
@@ -21,6 +22,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   String? _loadError;
   List<Map<String, dynamic>> _leads = [];
   bool _hasMore = true;
+  String _publicLinkId = '';
   static const _pageSize = 15;
 
   @override
@@ -53,6 +55,9 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
           });
         }
       }
+
+      final publicId = await AgentProvider.resolvePublicLinkId(uid);
+      if (mounted) setState(() => _publicLinkId = publicId);
 
       final leadsSnapshot = await runWithTimeout(
         () => FirebaseFirestore.instance
@@ -156,32 +161,9 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
 
-    var publicId = uid;
-    try {
-      final userSnap =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      final companyId = userSnap.data()?['companyId'] as String?;
-      final sellerId = userSnap.data()?['sellerId'] as String?;
-      if (companyId != null && sellerId != null) {
-        final sellerSnap = await FirebaseFirestore.instance
-            .collection('companies')
-            .doc(companyId)
-            .collection('sellers')
-            .doc(sellerId)
-            .get();
-        final slug = sellerSnap.data()?['slug'] as String?;
-        if (slug != null && slug.isNotEmpty) publicId = slug;
-      }
-      final slugFromAgent = (await FirebaseFirestore.instance
-              .collection('agents')
-              .doc(uid)
-              .get())
-          .data()?['slug'] as String?;
-      if (slugFromAgent != null && slugFromAgent.isNotEmpty) {
-        publicId = slugFromAgent;
-      }
-    } catch (_) {}
-
+    final publicId = _publicLinkId.isNotEmpty
+        ? _publicLinkId
+        : await AgentProvider.resolvePublicLinkId(uid);
     final link = 'https://hitlook-app.web.app/a/$publicId';
     await Clipboard.setData(ClipboardData(text: link));
     if (!mounted) return;
@@ -227,36 +209,14 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                       ),
                       child: Row(
                         children: [
-                          // Avatar
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.blackLight,
-                              border: Border.all(
-                                color: AppColors.gold.withOpacity(0.4),
-                              ),
-                            ),
-                            child: _agent.fotoUrl.isNotEmpty
-                                ? ClipOval(
-                                    child: Image.network(
-                                      _agent.fotoUrl,
-                                      fit: BoxFit.cover,
-                                    ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      _agent.nome.isNotEmpty
-                                          ? _agent.nome[0].toUpperCase()
-                                          : 'A',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w900,
-                                        color: AppColors.gold,
-                                      ),
-                                    ),
-                                  ),
+                          AgentProfilePhoto(
+                            displayName: _agent.nome.isNotEmpty
+                                ? _agent.nome
+                                : 'Agente',
+                            storageUid: FirebaseAuth.instance.currentUser?.uid,
+                            photoUrl:
+                                _agent.fotoUrl.isNotEmpty ? _agent.fotoUrl : null,
+                            size: 44,
                           ),
 
                           const SizedBox(width: 12),
@@ -363,7 +323,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'hitlook-app.web.app/a/${FirebaseAuth.instance.currentUser?.uid ?? ''}',
+                              'hitlook-app.web.app/a/${_publicLinkId.isNotEmpty ? _publicLinkId : (FirebaseAuth.instance.currentUser?.uid ?? '')}',
                               style: const TextStyle(
                                 fontSize: 12,
                                 color: AppColors.whitesoft,

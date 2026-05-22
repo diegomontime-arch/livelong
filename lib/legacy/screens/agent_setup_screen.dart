@@ -10,7 +10,8 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/firestore_paths.dart';
 import 'package:hitlook/data/models/seller.dart';
-import 'package:hitlook/legacy/admin/admin_seller_avatar.dart';
+import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
+import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/widgets/flow_ux.dart';
 
@@ -43,6 +44,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   bool _obscureAtual = true;
   bool _obscureNova = true;
   bool _obscureConfirm = true;
+  String _publicLinkId = '';
 
   @override
   void initState() {
@@ -63,15 +65,17 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     super.dispose();
   }
 
-  Future<void> _loadPerfil() async {
+  Future<void> _loadPerfil({bool silent = false}) async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    setState(() => _loading = true);
+    if (!silent && mounted) setState(() => _loading = true);
     try {
       final doc = await FirebaseFirestore.instance
           .collection('agents')
           .doc(uid)
           .get(const GetOptions(source: Source.server));
+      final publicId = await AgentProvider.resolvePublicLinkId(uid);
+
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         _nomeCtrl.text = data['nome'] as String? ?? '';
@@ -81,20 +85,42 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         _linkedinCtrl.text = data['linkedinUrl'] as String? ?? '';
         _idioma = data['idioma'] as String? ?? 'pt';
         _nicho = data['nicho'] as String? ?? 'seguro';
-        final url = data['fotoUrl'] as String? ?? data['photoUrl'] as String?;
+        final url = AgentPhotoPersistence.readUrlFromAgentMap(data);
         debugPrint('[HitLook:Profile] load agents/$uid fotoUrl=$url');
+
+        Uint8List? storageBytes;
+        if (url != null) {
+          try {
+            storageBytes = await FirebaseStorage.instance
+                .ref()
+                .child('agents/$uid/photo')
+                .getData(AgentPhotoPersistence.maxPhotoBytes);
+            debugPrint(
+              '[HitLook:Profile] storage bytes=${storageBytes?.length ?? 0}',
+            );
+          } catch (e) {
+            debugPrint('[HitLook:Profile] storage read: $e');
+          }
+        }
+
         if (mounted) {
           setState(() {
             _fotoUrl = url;
-            _fotoBytes = null;
+            _publicLinkId = publicId;
+            if (storageBytes != null && storageBytes.isNotEmpty) {
+              _fotoBytes = storageBytes;
+            } else if (url == null) {
+              _fotoBytes = null;
+            }
           });
         }
       } else {
         debugPrint('[HitLook:Profile] agents/$uid doc missing');
+        if (mounted) setState(() => _publicLinkId = publicId);
       }
     } catch (e, st) {
       debugPrint('[HitLook:Profile] load FAILED: $e\n$st');
-      if (mounted) {
+      if (!silent && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erro ao carregar perfil: $e'),
@@ -103,7 +129,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         );
       }
     }
-    if (mounted) setState(() => _loading = false);
+    if (!silent && mounted) setState(() => _loading = false);
   }
 
   Future<void> _selecionarFoto() async {
@@ -156,15 +182,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
 
   Future<String?> _uploadFoto(String uid) async {
     if (_fotoBytes == null) return _fotoUrl;
-    final ref = FirebaseStorage.instance.ref().child('agents/$uid/photo');
-    debugPrint('[HitLook:Profile] uploading → agents/$uid/photo');
-    final task = await ref.putData(
-      _fotoBytes!,
-      SettableMetadata(contentType: _fotoContentType ?? 'image/jpeg'),
+    return AgentPhotoPersistence.upload(
+      uid: uid,
+      bytes: _fotoBytes!,
+      contentType: _fotoContentType ?? 'image/jpeg',
     );
-    final url = await task.ref.getDownloadURL();
-    debugPrint('[HitLook:Profile] upload OK → $url');
-    return url;
   }
 
   Future<void> _salvar() async {
@@ -197,6 +219,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       String? foto;
       if (_fotoBytes != null) {
         foto = await _uploadFoto(uid);
+        if (foto == null || foto.trim().isEmpty) {
+          throw Exception(
+            'A foto foi enviada mas não gerou URL. Tente outra imagem.',
+          );
+        }
       } else {
         foto = _fotoUrl;
       }
@@ -208,18 +235,44 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       final instagram = _instagramCtrl.text.trim();
       final linkedin = _linkedinCtrl.text.trim();
 
-      await FirebaseFirestore.instance.collection('agents').doc(uid).set({
+      final publicId = await AgentProvider.resolvePublicLinkId(uid);
+
+      final agentPayload = <String, dynamic>{
         'nome': nome,
         'bio': bio,
         'whatsapp': whatsapp,
-        'fotoUrl': fotoFinal,
         'userId': uid,
         'idioma': _idioma,
         'nicho': _nicho,
+        if (publicId != uid) 'slug': publicId,
         if (instagram.isNotEmpty) 'instagramUrl': instagram,
         if (linkedin.isNotEmpty) 'linkedinUrl': linkedin,
         'updatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      if (fotoFinal.isNotEmpty) {
+        agentPayload.addAll(AgentPhotoPersistence.photoFields(fotoFinal));
+      }
+
+      await FirebaseFirestore.instance
+          .collection('agents')
+          .doc(uid)
+          .set(agentPayload, SetOptions(merge: true));
+
+      if (_fotoBytes != null && fotoFinal.isNotEmpty) {
+        final verifyDoc = await FirebaseFirestore.instance
+            .collection('agents')
+            .doc(uid)
+            .get(const GetOptions(source: Source.server));
+        final savedUrl = verifyDoc.exists && verifyDoc.data() != null
+            ? AgentPhotoPersistence.readUrlFromAgentMap(verifyDoc.data()!)
+            : null;
+        if (savedUrl == null || savedUrl.isEmpty) {
+          throw Exception(
+            'A foto foi enviada mas não apareceu no perfil. Tente salvar de novo.',
+          );
+        }
+        debugPrint('[HitLook:Profile] verify agents/$uid fotoUrl=$savedUrl');
+      }
 
       debugPrint(
         '[HitLook:Profile] saved agents/$uid fotoUrl=$fotoFinal',
@@ -253,7 +306,14 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         }
       }
 
-      await _loadPerfil();
+      if (mounted) {
+        setState(() {
+          if (fotoFinal.isNotEmpty) _fotoUrl = fotoFinal;
+          _publicLinkId = publicId;
+        });
+      }
+
+      await _loadPerfil(silent: true);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -386,11 +446,10 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       '[HitLook:Profile] sync seller/$sellerId slug=$slug fotoUrl=$fotoUrl',
     );
 
-    await FirebaseFirestore.instance.collection('agents').doc(slug).set({
+    final mirrorPayload = <String, dynamic>{
       'nome': nome,
       'bio': bio,
       'whatsapp': whatsapp,
-      'fotoUrl': fotoUrl,
       'userId': uid,
       'slug': slug,
       'idioma': idioma,
@@ -398,7 +457,14 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       if (instagramUrl.isNotEmpty) 'instagramUrl': instagramUrl,
       if (linkedinUrl.isNotEmpty) 'linkedinUrl': linkedinUrl,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+    if (fotoUrl.isNotEmpty) {
+      mirrorPayload.addAll(AgentPhotoPersistence.photoFields(fotoUrl));
+    }
+    await FirebaseFirestore.instance
+        .collection('agents')
+        .doc(slug)
+        .set(mirrorPayload, SetOptions(merge: true));
   }
 
   @override
@@ -455,22 +521,16 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                           child: Stack(
                             clipBehavior: Clip.none,
                             children: [
-                              _fotoBytes != null
-                                  ? ClipOval(
-                                      child: Image.memory(
-                                        _fotoBytes!,
-                                        width: 100,
-                                        height: 100,
-                                        fit: BoxFit.cover,
-                                      ),
-                                    )
-                                  : AdminSellerAvatar(
-                                      displayName: _nomeCtrl.text.isNotEmpty
-                                          ? _nomeCtrl.text
-                                          : 'Agente',
-                                      photoUrl: _fotoUrl,
-                                      size: 100,
-                                    ),
+                              AgentProfilePhoto(
+                                displayName: _nomeCtrl.text.isNotEmpty
+                                    ? _nomeCtrl.text
+                                    : 'Agente',
+                                storageUid:
+                                    FirebaseAuth.instance.currentUser?.uid,
+                                photoUrl: _fotoUrl,
+                                previewBytes: _fotoBytes,
+                                size: 100,
+                              ),
                               Positioned(
                                 bottom: 0,
                                 right: 0,
@@ -586,10 +646,12 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
 
                         Builder(
                           builder: (context) {
-                            final uid = FirebaseAuth.instance.currentUser?.uid;
-                            final link = uid != null
-                                ? 'https://hitlook-app.web.app/a/$uid'
-                                : 'https://hitlook-app.web.app/a/seu-link';
+                            final publicId = _publicLinkId.isNotEmpty
+                                ? _publicLinkId
+                                : (FirebaseAuth.instance.currentUser?.uid ??
+                                    'seu-link');
+                            final link =
+                                'https://hitlook-app.web.app/a/$publicId';
                             return GestureDetector(
                               onTap: () {
                                 Clipboard.setData(ClipboardData(text: link));
