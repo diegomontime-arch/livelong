@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:hitlook/legacy/admin/admin_seller_avatar.dart';
 
 /// Avatar that loads agent photos via Storage SDK (avoids web CORS on [Image.network]).
@@ -27,13 +28,13 @@ class AgentProfilePhoto extends StatefulWidget {
 }
 
 class _AgentProfilePhotoState extends State<AgentProfilePhoto> {
-  Uint8List? _storageBytes;
-  bool _loadingStorage = false;
+  Uint8List? _imageBytes;
+  bool _loading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadFromStorage();
+    _loadPhoto();
   }
 
   @override
@@ -42,33 +43,56 @@ class _AgentProfilePhotoState extends State<AgentProfilePhoto> {
     if (oldWidget.storageUid != widget.storageUid ||
         oldWidget.photoUrl != widget.photoUrl ||
         oldWidget.previewBytes != widget.previewBytes) {
-      _loadFromStorage();
+      _loadPhoto();
     }
   }
 
-  Future<void> _loadFromStorage() async {
+  Future<void> _loadPhoto() async {
     if (widget.previewBytes != null && widget.previewBytes!.isNotEmpty) {
       return;
     }
-    final uid = widget.storageUid?.trim() ?? '';
-    if (uid.isEmpty) return;
 
-    setState(() => _loadingStorage = true);
-    try {
-      final ref = FirebaseStorage.instance.ref().child('agents/$uid/photo');
-      final data = await ref.getData(4 * 1024 * 1024);
-      if (!mounted) return;
-      setState(() {
-        _storageBytes = data;
-        _loadingStorage = false;
-      });
-      debugPrint(
-        '[HitLook:Photo] storage agents/$uid/photo bytes=${data?.length ?? 0}',
-      );
-    } catch (e, st) {
-      debugPrint('[HitLook:Photo] storage load failed: $e\n$st');
-      if (mounted) setState(() => _loadingStorage = false);
+    setState(() {
+      _loading = true;
+      _imageBytes = null;
+    });
+
+    final uid = widget.storageUid?.trim() ?? '';
+    final url = widget.photoUrl?.trim() ?? '';
+
+    Uint8List? bytes;
+
+    if (uid.isNotEmpty) {
+      try {
+        final ref = FirebaseStorage.instance.ref().child('agents/$uid/photo');
+        bytes = await ref.getData(AgentPhotoPersistence.maxPhotoBytes);
+        debugPrint(
+          '[HitLook:Photo] storage agents/$uid/photo bytes=${bytes?.length ?? 0}',
+        );
+      } catch (e, st) {
+        debugPrint('[HitLook:Photo] storage failed: $e\n$st');
+      }
     }
+
+    if ((bytes == null || bytes.isEmpty) && url.isNotEmpty) {
+      try {
+        final response = await http.get(Uri.parse(url));
+        if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          bytes = response.bodyBytes;
+          debugPrint(
+            '[HitLook:Photo] url bytes=${bytes.length} (web-safe)',
+          );
+        }
+      } catch (e, st) {
+        debugPrint('[HitLook:Photo] url fetch failed: $e\n$st');
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _imageBytes = bytes;
+      _loading = false;
+    });
   }
 
   @override
@@ -78,12 +102,12 @@ class _AgentProfilePhotoState extends State<AgentProfilePhoto> {
       return _circle(Image.memory(preview, fit: BoxFit.cover));
     }
 
-    final cached = _storageBytes;
+    final cached = _imageBytes;
     if (cached != null && cached.isNotEmpty) {
       return _circle(Image.memory(cached, fit: BoxFit.cover));
     }
 
-    if (_loadingStorage) {
+    if (_loading) {
       return _circle(
         const Center(
           child: SizedBox(

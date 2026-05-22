@@ -692,6 +692,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late Animation<double> _fadeIn;
   late Animation<Offset> _slideUp;
   AgentProfile _agent = AgentProfile.defaultProfile;
+  String _publicSlug = '';
   bool _loadingAgent = true;
   bool _agentNotFound = false;
   String? _loadError;
@@ -722,18 +723,30 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     });
 
     try {
-      final agent = await AgentProvider.loadAgent(widget.agentId);
+      var loadId = widget.agentId;
+      var publicSlug = widget.agentId;
+
+      if (AgentProvider.looksLikeFirebaseUid(loadId)) {
+        final slug = await AgentProvider.resolvePublicLinkId(loadId);
+        if (slug.isNotEmpty && !AgentProvider.looksLikeFirebaseUid(slug)) {
+          loadId = slug;
+          publicSlug = slug;
+        }
+      }
+
+      final agent = await AgentProvider.loadAgent(loadId);
 
       if (!mounted) return;
 
-      final notFound = !isRealPublicAgent(agent, widget.agentId);
+      final notFound = !isRealPublicAgent(agent, loadId);
       debugPrint(
-        '[HitLook:Agent] WelcomeScreen agentId=${widget.agentId} '
+        '[HitLook:Agent] WelcomeScreen agentId=${widget.agentId} loadId=$loadId '
         'nome="${agent.nome}" resolved="${agent.resolvedNome}" '
         'foto=${agent.fotoUrl.isNotEmpty} userId=${agent.userId} notFound=$notFound',
       );
       setState(() {
         _agent = agent;
+        _publicSlug = publicSlug;
         _agentNotFound = notFound;
         _loadingAgent = false;
       });
@@ -864,7 +877,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       padding: const EdgeInsets.symmetric(horizontal: 0),
                       child: AgentCard(
                         agent: _agent,
-                        publicSlug: widget.agentId,
+                        publicSlug: _publicSlug.isNotEmpty
+                            ? _publicSlug
+                            : widget.agentId,
                       ),
                     ),
 
