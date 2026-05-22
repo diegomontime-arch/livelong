@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
@@ -488,16 +487,11 @@ class AgentCard extends StatelessWidget {
 
   const AgentCard({super.key, required this.agent, this.publicSlug});
 
-  String? _slugFromRoute(BuildContext context) {
-    final fromRoute = GoRouterState.of(context).pathParameters['sellerSlug'];
-    if (fromRoute != null && fromRoute.isNotEmpty) return fromRoute;
-    return publicSlug;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final routeSlug = _slugFromRoute(context);
-    final displayName = agentPublicDisplayName(agent, publicSlug: routeSlug);
+    // publicSlug vem do pai (ex. WelcomeScreen.agentId) — não usar GoRouterState
+    // aqui: esta tela é aberta com Navigator.push, fora de RouteBase.builder.
+    final displayName = agentPublicDisplayName(agent, publicSlug: publicSlug);
 
     return Container(
       padding: const EdgeInsets.all(16),

@@ -29,7 +29,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (session.companyId != AppConfig.masterCompanyId) {
       final target = RoutePaths.adminCompany(session.companyId);
-      if (GoRouterState.of(context).uri.path != target) {
+      final router = GoRouter.of(context);
+      if (router.state.uri.path != target) {
         context.go(target);
       }
     }
