@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 import 'package:hitlook/core/constants/firestore_paths.dart';
 import 'package:hitlook/core/errors/app_exception.dart';
@@ -29,16 +30,27 @@ class FirebaseLeadRepository implements LeadRepository {
     });
   }
 
+  List<Lead> _leadsFromSnapshot(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+    String companyId,
+  ) {
+    final out = <Lead>[];
+    for (final doc in snapshot.docs) {
+      try {
+        out.add(_fromSnapshot(doc.id, doc.data(), companyId));
+      } catch (e, st) {
+        debugPrint('[LeadRepo] skip ${doc.id}: $e\n$st');
+      }
+    }
+    return out;
+  }
+
   @override
   Stream<List<Lead>> watchByCompany(String companyId) {
     return _leads(companyId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => _fromSnapshot(doc.id, doc.data(), companyId))
-              .toList(),
-        );
+        .map((snapshot) => _leadsFromSnapshot(snapshot, companyId));
   }
 
   @override
@@ -50,11 +62,7 @@ class FirebaseLeadRepository implements LeadRepository {
         .where('sellerId', isEqualTo: sellerId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map((doc) => _fromSnapshot(doc.id, doc.data(), companyId))
-              .toList(),
-        );
+        .map((snapshot) => _leadsFromSnapshot(snapshot, companyId));
   }
 
   @override

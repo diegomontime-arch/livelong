@@ -234,6 +234,15 @@ class _CompanyCard extends StatelessWidget {
                   return StreamBuilder(
                     stream: leadRepo.watchByCompany(company.id),
                     builder: (context, leadsSnap) {
+                      if (leadsSnap.hasError) {
+                        return Row(
+                          children: [
+                            _Stat(label: 'Agentes', value: '$agentCount'),
+                            const SizedBox(width: 24),
+                            const _Stat(label: 'Leads', value: '—'),
+                          ],
+                        );
+                      }
                       final leadCount = leadsSnap.data?.length ?? 0;
                       return Row(
                         children: [

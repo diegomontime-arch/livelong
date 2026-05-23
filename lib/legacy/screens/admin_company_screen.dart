@@ -154,6 +154,19 @@ class _AdminCompanyScreenState extends State<AdminCompanyScreen> {
                     return StreamBuilder<List<Lead>>(
                       stream: _leadRepo.watchByCompany(widget.companyId),
                       builder: (context, leadsSnap) {
+                        if (leadsSnap.hasError) {
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                'Erro ao carregar leads. Tente novamente.\n${leadsSnap.error}',
+                                style: const TextStyle(color: AppColors.greyLight),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          );
+                        }
+
                         final leads = leadsSnap.data ?? [];
                         final metricsBySeller = SellerMetrics.bySeller(leads);
                         final companyMetrics = SellerMetrics.fromLeads(leads);

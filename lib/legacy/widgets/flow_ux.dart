@@ -73,6 +73,32 @@ String formatLeadDate(dynamic value, {String locale = 'pt_BR'}) {
   return DateFormat('dd/MM/yyyy HH:mm', locale).format(dt);
 }
 
+String leadDisplayName(Map<String, dynamic> lead) {
+  final raw = lead['nome'] ?? lead['prospectName'] ?? lead['name'];
+  if (raw == null || raw.toString().trim().isEmpty) {
+    return 'Nome não informado';
+  }
+  return raw.toString();
+}
+
+String leadDisplayPhone(Map<String, dynamic> lead) {
+  final raw = lead['telefone'] ?? lead['prospectPhone'] ?? lead['phone'];
+  return raw?.toString() ?? '';
+}
+
+int leadDisplayScore(Map<String, dynamic> lead) {
+  final score = lead['score'] ?? 0;
+  if (score is int) return score;
+  return int.tryParse('$score') ?? 0;
+}
+
+DateTime? leadCreatedAt(Map<String, dynamic> lead) {
+  final value = lead['createdAt'];
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  return null;
+}
+
 class FlowBackButton extends StatelessWidget {
   const FlowBackButton({super.key, this.onPressed});
 

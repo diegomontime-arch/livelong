@@ -40,9 +40,15 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
   static const _statusOptions = [
     LeadStatus.newLead,
     LeadStatus.contacted,
+    LeadStatus.followUp,
     LeadStatus.closed,
     LeadStatus.lost,
   ];
+
+  static LeadStatus _dropdownStatus(LeadStatus status) {
+    if (_statusOptions.contains(status)) return status;
+    return LeadStatus.newLead;
+  }
 
   @override
   void initState() {
@@ -175,6 +181,19 @@ class _AdminSellerLeadsScreenState extends State<AdminSellerLeadsScreen> {
                         !snap.hasData) {
                       return const Center(
                         child: CircularProgressIndicator(color: AppColors.gold),
+                      );
+                    }
+
+                    if (snap.hasError) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'Erro ao carregar leads. Tente novamente.\n${snap.error}',
+                            style: const TextStyle(color: AppColors.greyLight),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       );
                     }
 
@@ -362,7 +381,7 @@ class _LeadAdminCard extends StatelessWidget {
           const SizedBox(height: 12),
           DropdownButtonFormField<LeadStatus>(
             key: ValueKey('${lead.id}_${lead.status.name}'),
-            initialValue: lead.status,
+            value: _AdminSellerLeadsScreenState._dropdownStatus(lead.status),
             dropdownColor: AppColors.blackCard,
             style: const TextStyle(color: AppColors.white, fontSize: 13),
             decoration: InputDecoration(

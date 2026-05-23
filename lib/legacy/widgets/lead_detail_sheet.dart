@@ -32,11 +32,9 @@ class _LeadDetailSheetState extends State<LeadDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final lead = widget.lead;
-    final nome = lead['nome']?.toString() ?? 'Nome não informado';
-    final telefone = lead['telefone']?.toString() ?? '';
-    final scoreRaw = lead['score'] ?? 0;
-    final scoreInt =
-        scoreRaw is int ? scoreRaw : int.tryParse('$scoreRaw') ?? 0;
+    final nome = leadDisplayName(lead);
+    final telefone = leadDisplayPhone(lead);
+    final scoreInt = leadDisplayScore(lead);
     final lang = lead['lang']?.toString() ?? 'pt';
     final nascimento = lead['nascimento']?.toString() ?? '';
     final answers = lead['answers'];

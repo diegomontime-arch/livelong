@@ -34,7 +34,7 @@ class Lead {
       status: LeadStatus.fromString(map['status'] as String?),
       locale: map['locale'] as String?,
       score: (map['score'] as num?)?.toInt(),
-      answers: Map<String, dynamic>.from(map['answers'] as Map? ?? {}),
+      answers: _parseAnswers(map['answers']),
       recommendedPlan: map['recommendedPlan'] as String?,
       prospectName: map['prospectName'] as String? ??
           map['nome'] as String? ??
@@ -44,6 +44,15 @@ class Lead {
           map['phone'] as String?,
       createdAt: map['createdAt'] is DateTime ? map['createdAt'] as DateTime : null,
     );
+  }
+
+  static Map<String, dynamic> _parseAnswers(dynamic raw) {
+    if (raw is Map) {
+      return Map<String, dynamic>.from(
+        raw.map((k, v) => MapEntry(k.toString(), v)),
+      );
+    }
+    return const {};
   }
 
   Map<String, dynamic> toMap() => {

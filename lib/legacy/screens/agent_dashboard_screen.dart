@@ -34,9 +34,138 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     _loadData();
   }
 
+  Future<String?> _resolveUid() async {
+    var uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid != null) return uid;
+    try {
+      final user = await FirebaseAuth.instance
+          .authStateChanges()
+          .firstWhere((u) => u != null)
+          .timeout(const Duration(seconds: 6));
+      return user?.uid;
+    } catch (_) {
+      return FirebaseAuth.instance.currentUser?.uid;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchRootLeads(String uid) async {
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await FirebaseFirestore.instance
+          .collection('leads')
+          .where('agentId', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .limit(_pageSize)
+          .get();
+    } on FirebaseException catch (e) {
+      if (e.code != 'failed-precondition') rethrow;
+      snapshot = await FirebaseFirestore.instance
+          .collection('leads')
+          .where('agentId', isEqualTo: uid)
+          .limit(_pageSize)
+          .get();
+    }
+
+    final rows = snapshot.docs
+        .map((doc) => {'id': doc.id, ...doc.data()})
+        .toList();
+    rows.sort((a, b) {
+      final da = leadCreatedAt(a);
+      final db = leadCreatedAt(b);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return db.compareTo(da);
+    });
+    return rows;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchCompanyLeads(AgentProfile agent) async {
+    if (!agent.hasSaaSContext) return const [];
+
+    final companyId = agent.companyId!;
+    final sellerId = agent.sellerId!;
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await FirebaseFirestore.instance
+          .collection('companies')
+          .doc(companyId)
+          .collection('leads')
+          .where('sellerId', isEqualTo: sellerId)
+          .orderBy('createdAt', descending: true)
+          .limit(_pageSize)
+          .get();
+    } on FirebaseException catch (e) {
+      if (e.code != 'failed-precondition') rethrow;
+      snapshot = await FirebaseFirestore.instance
+          .collection('companies')
+          .doc(companyId)
+          .collection('leads')
+          .where('sellerId', isEqualTo: sellerId)
+          .limit(_pageSize)
+          .get();
+    }
+
+    return snapshot.docs
+        .map(
+          (doc) => {
+            'id': doc.id,
+            'companyId': companyId,
+            'companyLead': true,
+            ...doc.data(),
+          },
+        )
+        .toList();
+  }
+
+  List<Map<String, dynamic>> _mergeLeadRows(
+    List<Map<String, dynamic>> rootLeads,
+    List<Map<String, dynamic>> companyLeads,
+  ) {
+    final byKey = <String, Map<String, dynamic>>{};
+    for (final lead in rootLeads) {
+      final id = lead['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      byKey['root:$id'] = lead;
+    }
+    for (final lead in companyLeads) {
+      final id = lead['id']?.toString();
+      if (id == null || id.isEmpty) continue;
+      final phone = leadDisplayPhone(lead);
+      final name = leadDisplayName(lead);
+      final duplicate = rootLeads.any(
+        (r) =>
+            leadDisplayPhone(r) == phone &&
+            phone.isNotEmpty &&
+            leadDisplayName(r) == name,
+      );
+      if (!duplicate) {
+        byKey['company:$id'] = lead;
+      }
+    }
+    final merged = byKey.values.toList();
+    merged.sort((a, b) {
+      final da = leadCreatedAt(a);
+      final db = leadCreatedAt(b);
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return db.compareTo(da);
+    });
+    return merged;
+  }
+
   Future<void> _loadData({bool refresh = false}) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
+    final uid = await _resolveUid();
+    if (uid == null) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = 'Faça login novamente para ver seus leads.';
+        });
+      }
+      return;
+    }
 
     if (refresh) {
       setState(() {
@@ -51,27 +180,17 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         () => FirebaseFirestore.instance.collection('agents').doc(uid).get(),
       );
 
+      var agent = _agent;
       if (agentDoc != null && agentDoc.exists && agentDoc.data() != null) {
-        if (mounted) {
-          setState(() {
-            _agent = AgentProfile.fromMap(uid, agentDoc.data()!);
-          });
-        }
+        agent = AgentProfile.fromMap(uid, agentDoc.data()!);
+        if (mounted) setState(() => _agent = agent);
       }
 
       final publicId = await AgentProvider.resolvePublicLinkId(uid);
       if (mounted) setState(() => _publicLinkId = publicId);
 
-      final leadsSnapshot = await runWithTimeout(
-        () => FirebaseFirestore.instance
-            .collection('leads')
-            .where('agentId', isEqualTo: uid)
-            .orderBy('createdAt', descending: true)
-            .limit(_pageSize)
-            .get(),
-      );
-
-      if (leadsSnapshot == null) {
+      final rootLeads = await runWithTimeout(() => _fetchRootLeads(uid));
+      if (rootLeads == null) {
         if (mounted) {
           setState(() {
             _loading = false;
@@ -82,23 +201,31 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         return;
       }
 
+      List<Map<String, dynamic>> companyLeads = const [];
+      try {
+        companyLeads = await _fetchCompanyLeads(agent);
+      } catch (e) {
+        debugPrint('[Dashboard] company leads: $e');
+      }
+
+      final merged = _mergeLeadRows(rootLeads, companyLeads);
+
       if (mounted) {
         setState(() {
-          _leads = leadsSnapshot.docs
-              .map((doc) => {'id': doc.id, ...doc.data()})
-              .toList();
-          _hasMore = leadsSnapshot.docs.length >= _pageSize;
+          _leads = merged;
+          _hasMore = merged.length >= _pageSize;
           _loading = false;
           _loadError = null;
         });
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('[Dashboard] load leads: $e\n$st');
       if (mounted) {
         setState(() {
           _loading = false;
           _loadError = isNetworkError(e)
               ? 'Sem conexão com a internet. Puxe para atualizar.'
-              : 'Não foi possível carregar seus leads. Tente novamente.';
+              : 'Erro ao carregar leads. Tente novamente.';
         });
       }
     }
@@ -112,9 +239,20 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     if (id == null) return;
 
     try {
-      await FirebaseFirestore.instance.collection('leads').doc(id).update({
-        'status': status,
-      });
+      final companyId = lead['companyId'] as String?;
+      final isCompanyLead = lead['companyLead'] == true && companyId != null;
+      if (isCompanyLead) {
+        await FirebaseFirestore.instance
+            .collection('companies')
+            .doc(companyId)
+            .collection('leads')
+            .doc(id)
+            .update({'status': status});
+      } else {
+        await FirebaseFirestore.instance.collection('leads').doc(id).update({
+          'status': status,
+        });
+      }
       if (!mounted) return;
       setState(() {
         lead['status'] = status;
@@ -554,13 +692,12 @@ class _LeadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final nome = lead['nome'] ?? 'Nome não informado';
-    final telefone = lead['telefone']?.toString() ?? '';
-    final score = lead['score'] ?? 0;
-    final status = normalizeLeadStatus(lead['status'] as String?);
+    final nome = leadDisplayName(lead);
+    final telefone = leadDisplayPhone(lead);
+    final scoreInt = leadDisplayScore(lead);
+    final status = normalizeLeadStatus(lead['status']?.toString());
     final meta = dashboardLeadStatusMeta(status);
     final lang = lead['lang']?.toString() ?? 'pt';
-    final scoreInt = score is int ? score : int.tryParse('$score') ?? 0;
 
     return Material(
       color: AppColors.blackCard,
@@ -589,7 +726,7 @@ class _LeadCard extends StatelessWidget {
                 ),
                 child: Center(
                   child: Text(
-                    '$score%',
+                    '$scoreInt%',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
