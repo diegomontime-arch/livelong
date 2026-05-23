@@ -6,9 +6,9 @@
   var PROJECT_ID = 'hitlook-app';
   var BASE = 'https://hitlook-app.web.app';
   var DEFAULT_IMAGE = BASE + '/icons/og-image.png';
-  var DEFAULT_TITLE = 'Descubra seu nível de proteção familiar';
   var DEFAULT_DESC =
-    'Descubra seu nível de proteção financeira em menos de 2 minutos.';
+    'Descubra seu nível de proteção familiar em menos de 2 minutos.';
+  var BRAND_SUFFIX = 'M4LIFE USA';
 
   var match = window.location.pathname.match(/^\/a\/([^/]+)\/?$/);
   if (!match) return;
@@ -28,19 +28,32 @@
     el.setAttribute('content', value);
   }
 
+  function resolveImage(photoUrl) {
+    if (!photoUrl) return DEFAULT_IMAGE;
+    if (photoUrl.indexOf('http://') === 0 || photoUrl.indexOf('https://') === 0) {
+      return photoUrl;
+    }
+    return DEFAULT_IMAGE;
+  }
+
   function applyOg(name, photoUrl) {
-    var title = DEFAULT_TITLE;
-    var desc = name
-      ? name + ' — ' + DEFAULT_DESC
-      : DEFAULT_DESC;
-    var image = photoUrl || DEFAULT_IMAGE;
+    var title = name
+      ? name + ' — ' + BRAND_SUFFIX
+      : BRAND_SUFFIX + ' — Proteção Familiar';
+    var desc = DEFAULT_DESC;
+    var image = resolveImage(photoUrl);
     var url = BASE + '/a/' + encodeURIComponent(agentId);
 
-    document.title = name ? name + ' | M4LIFE USA' : 'M4LIFE USA — Proteção Familiar';
+    document.title = title;
     setMeta('name', 'description', desc);
+    setMeta('property', 'og:site_name', 'HitLook');
     setMeta('property', 'og:title', title);
     setMeta('property', 'og:description', desc);
     setMeta('property', 'og:image', image);
+    setMeta('property', 'og:image:secure_url', image.indexOf('https://') === 0 ? image : DEFAULT_IMAGE);
+    setMeta('property', 'og:image:type', image === DEFAULT_IMAGE ? 'image/png' : '');
+    setMeta('property', 'og:image:width', image === DEFAULT_IMAGE ? '1200' : '');
+    setMeta('property', 'og:image:height', image === DEFAULT_IMAGE ? '630' : '');
     setMeta('property', 'og:url', url);
     setMeta('property', 'og:type', 'website');
     setMeta('name', 'twitter:card', 'summary_large_image');
