@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'living_benefit_screen.dart';
@@ -230,16 +231,29 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   Future<void> _preloadConsultantPhone() async {
+    debugPrint(
+      '[WhatsApp] preload start agentId=${widget.agentId} '
+      'número=${formatWhatsAppNumber(_consultantPhone)}',
+    );
+
     if (widget.agentId.isEmpty || widget.agentId == 'default') return;
 
     try {
       final agent = await AgentProvider.loadAgent(widget.agentId);
       final raw = agent.whatsapp.trim();
       if (raw.isNotEmpty && normalizeWhatsAppNumber(raw).isNotEmpty) {
-        if (mounted) setState(() => _consultantPhone = raw);
+        if (mounted) {
+          setState(() => _consultantPhone = raw);
+          debugPrint(
+            '[WhatsApp] preload OK raw=$raw '
+            'número=${formatWhatsAppNumber(raw)}',
+          );
+        }
+      } else {
+        debugPrint('[WhatsApp] preload sem whatsapp no agente — usa default');
       }
-    } catch (_) {
-      // Keep default Renan number.
+    } catch (e) {
+      debugPrint('[WhatsApp] preload erro: $e — usa default');
     }
   }
 
@@ -299,7 +313,7 @@ class _ResultScreenState extends State<ResultScreen>
     if (mounted) setState(() => _chatLoading = false);
   }
 
-  /// Sync tap handler — no [setState] before launch (iOS Safari exige gesto do usuário).
+  /// Sync tap handler — sem await/setState antes do launch (iOS Safari).
   void _abrirWhatsApp() {
     if (_whatsAppLoading) return;
 
@@ -314,11 +328,14 @@ class _ResultScreenState extends State<ResultScreen>
 
     final msg = buildLeadWhatsAppMessage(lang: widget.lang, score: _score);
 
-    // Dispara launchUrl antes de setState (gesto do usuário no iOS Safari).
-    final openedFuture = openWhatsApp(phone: phone, message: msg);
-    setState(() => _whatsAppLoading = true);
+    if (kIsWeb) {
+      final opened = openWhatsAppImmediately(phone: phone, message: msg);
+      if (!opened && mounted) _mostrarErroWhatsApp();
+      return;
+    }
 
-    openedFuture.then((opened) {
+    setState(() => _whatsAppLoading = true);
+    openWhatsApp(phone: phone, message: msg).then((opened) {
       if (!opened && mounted) _mostrarErroWhatsApp();
     }).catchError((_) {
       if (mounted) _mostrarErroWhatsApp();

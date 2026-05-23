@@ -46,28 +46,35 @@ Uri buildWhatsAppUri({required String phone, required String message}) {
   );
 }
 
+/// Opens WhatsApp in the same synchronous turn as the user tap (required on iOS Safari).
+bool openWhatsAppImmediately({
+  required String phone,
+  required String message,
+}) {
+  final numero = formatWhatsAppNumber(
+    phone.trim().isEmpty ? kDefaultConsultantWhatsApp : phone,
+  );
+  final url =
+      'https://wa.me/$numero?text=${Uri.encodeComponent(message)}';
+  debugPrint('[WhatsApp] número=$numero url=$url');
+
+  if (kIsWeb) {
+    return whatsapp_launcher.openWhatsAppInBrowser(url);
+  }
+  return false;
+}
+
 /// Opens WhatsApp with a pre-filled message.
 Future<bool> openWhatsApp({
   required String phone,
   required String message,
 }) async {
+  if (kIsWeb) {
+    return openWhatsAppImmediately(phone: phone, message: message);
+  }
+
   final uri = buildWhatsAppUri(phone: phone, message: message);
   debugPrint('[WhatsApp] abrindo: $uri');
-
-  if (kIsWeb) {
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-      webOnlyWindowName: '_blank',
-    );
-    if (launched) {
-      debugPrint('[WhatsApp] launchUrl OK (externalApplication)');
-      return true;
-    }
-
-    debugPrint('[WhatsApp] launchUrl false — fallback window.open');
-    return whatsapp_launcher.openWhatsAppInBrowser(uri.toString());
-  }
 
   if (await canLaunchUrl(uri)) {
     return launchUrl(uri, mode: LaunchMode.externalApplication);
