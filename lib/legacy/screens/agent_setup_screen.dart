@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/firestore_paths.dart';
 import 'package:hitlook/data/models/seller.dart';
+import 'package:hitlook/core/utils/phone_input_formatter.dart';
 import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
@@ -80,7 +81,10 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         final data = doc.data()!;
         _nomeCtrl.text = data['nome'] as String? ?? '';
         _bioCtrl.text = data['bio'] as String? ?? '';
-        _whatsappCtrl.text = data['whatsapp'] as String? ?? '';
+        final rawPhone = data['whatsapp'] as String? ??
+            data['phone'] as String? ??
+            '';
+        _whatsappCtrl.text = formatUsPhoneDisplay(rawPhone);
         _instagramCtrl.text = data['instagramUrl'] as String? ?? '';
         _linkedinCtrl.text = data['linkedinUrl'] as String? ?? '';
         _idioma = data['idioma'] as String? ?? 'pt';
@@ -229,7 +233,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       }
       final nome = _nomeCtrl.text.trim();
       final bio = _bioCtrl.text.trim();
-      final whatsapp = _whatsappCtrl.text.trim();
+      final whatsapp = phoneForFirestore(_whatsappCtrl.text);
       final fotoFinal = foto?.trim() ?? '';
 
       final instagram = _instagramCtrl.text.trim();
@@ -598,14 +602,21 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                         _Campo(
                           ctrl: _whatsappCtrl,
                           label: 'WHATSAPP',
-                          hint: '+1 (786) 555-1234',
+                          hint: '(786) 555-1234',
                           icon: Icons.chat_outlined,
                           tipo: TextInputType.phone,
+                          inputFormatters: [PhoneInputFormatter()],
                           helpText:
-                              'Inclua o código do país. Ex: +1 para EUA, +55 para Brasil',
-                          validator: (v) => v == null || v.trim().isEmpty
-                              ? 'Digite seu WhatsApp'
-                              : null,
+                              'Inclua o código do país. Ex: +1 para EUA, +55 para Brasil. Salvo como +1 automaticamente.',
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Digite seu WhatsApp';
+                            }
+                            if (phoneDigitsFromInput(v).length < 10) {
+                              return 'Digite os 10 dígitos do telefone';
+                            }
+                            return null;
+                          },
                         ),
 
                         const SizedBox(height: 16),
@@ -894,6 +905,7 @@ class _Campo extends StatelessWidget {
   final bool obscure;
   final VoidCallback? onToggleObscure;
   final String? helpText;
+  final List<TextInputFormatter>? inputFormatters;
 
   const _Campo({
     required this.ctrl,
@@ -905,6 +917,7 @@ class _Campo extends StatelessWidget {
     this.obscure = false,
     this.onToggleObscure,
     this.helpText,
+    this.inputFormatters,
   });
 
   @override
@@ -926,6 +939,7 @@ class _Campo extends StatelessWidget {
           controller: ctrl,
           keyboardType: tipo,
           obscureText: obscure,
+          inputFormatters: inputFormatters,
           style: const TextStyle(color: AppColors.whiteWarm, fontSize: 15),
           validator: validator,
           decoration: InputDecoration(

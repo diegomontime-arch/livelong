@@ -5,9 +5,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
+import 'package:hitlook/legacy/admin/dashboard_lead_status.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/widgets/flow_ux.dart';
+import 'package:hitlook/legacy/widgets/lead_detail_sheet.dart';
 
 class AgentDashboardScreen extends StatefulWidget {
   const AgentDashboardScreen({super.key});
@@ -184,161 +186,23 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
 
   void _showLeadDetail(Map<String, dynamic> lead) {
     try {
-      final nome = lead['nome']?.toString() ?? 'Nome não informado';
-      final telefone = lead['telefone']?.toString() ?? '';
-      final score = lead['score'] ?? 0;
-      final status = normalizeLeadStatus(lead['status'] as String?);
-      final meta = _statusMeta(status);
-      final lang = lead['lang']?.toString() ?? 'pt';
-      final nascimento = lead['nascimento']?.toString() ?? '';
-      final answers = lead['answers'];
-
       showModalBottomSheet<void>(
         context: context,
         backgroundColor: AppColors.blackCard,
+        isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
         ),
-        builder: (ctx) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.grey.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  nome,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: meta.color.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        meta.label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: meta.color,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Score: $score%',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.gold,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                if (telefone.isNotEmpty)
-                  _LeadDetailRow(
-                    icon: Icons.phone_outlined,
-                    label: 'Telefone',
-                    value: telefone,
-                  ),
-                if (nascimento.isNotEmpty)
-                  _LeadDetailRow(
-                    icon: Icons.cake_outlined,
-                    label: 'Nascimento',
-                    value: nascimento,
-                  ),
-                _LeadDetailRow(
-                  icon: Icons.schedule,
-                  label: 'Recebido em',
-                  value: formatLeadDate(lead['createdAt']),
-                ),
-                _LeadDetailRow(
-                  icon: Icons.language,
-                  label: 'Idioma',
-                  value: lang.toUpperCase(),
-                ),
-                if (answers is Map && answers.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Respostas do questionário',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.greyLight,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...answers.entries.map(
-                    (e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '${e.key}: ${e.value}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.whiteWarm,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-                if (telefone.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        openWhatsApp(
-                          phone: telefone,
-                          message: buildLeadWhatsAppMessage(
-                            lang: lang,
-                            score: score is int ? score : int.tryParse('$score') ?? 0,
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.chat_outlined, size: 18),
-                      label: const Text('Abrir WhatsApp'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF25D366),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+        builder: (ctx) => LeadDetailSheet(
+          lead: lead,
+          onStatusChanged: (status) => _updateLeadStatus(lead, status),
         ),
       );
     } catch (e, st) {
       debugPrint('[LeadDetail] erro: $e\n$st');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
             'Não foi possível abrir os detalhes deste lead. Tente novamente.',
           ),
@@ -666,8 +530,6 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                                   return _LeadCard(
                                     lead: _leads[i],
                                     onTap: () => _showLeadDetail(_leads[i]),
-                                    onStatusChanged: (status) =>
-                                        _updateLeadStatus(_leads[i], status),
                                   );
                                 },
                               ),
@@ -681,93 +543,13 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   }
 }
 
-class _LeadStatusOption {
-  const _LeadStatusOption(this.value, this.label, this.color);
-  final String value;
-  final String label;
-  final Color color;
-}
-
-const _leadStatusOptions = [
-  _LeadStatusOption('novo', 'Novo', AppColors.gold),
-  _LeadStatusOption('contatado', 'Contatado', Color(0xFFF39C12)),
-  _LeadStatusOption('fechado', 'Fechado', Color(0xFF2ECC71)),
-  _LeadStatusOption('perdido', 'Perdido', Color(0xFF888888)),
-];
-
-/// Maps SaaS/legacy status values to dashboard dropdown values.
-String normalizeLeadStatus(String? raw) {
-  final s = (raw ?? 'novo').toString().toLowerCase().trim();
-  if (s == 'new') return 'novo';
-  const valid = {'novo', 'contatado', 'fechado', 'perdido'};
-  if (valid.contains(s)) return s;
-  return 'novo';
-}
-
-_LeadStatusOption _statusMeta(String status) {
-  return _leadStatusOptions.firstWhere(
-    (o) => o.value == status,
-    orElse: () => _leadStatusOptions.first,
-  );
-}
-
-class _LeadDetailRow extends StatelessWidget {
-  const _LeadDetailRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 16, color: AppColors.gold.withOpacity(0.7)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.greyLight,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _LeadCard extends StatelessWidget {
   final Map<String, dynamic> lead;
   final VoidCallback onTap;
-  final ValueChanged<String> onStatusChanged;
 
   const _LeadCard({
     required this.lead,
     required this.onTap,
-    required this.onStatusChanged,
   });
 
   @override
@@ -776,7 +558,7 @@ class _LeadCard extends StatelessWidget {
     final telefone = lead['telefone']?.toString() ?? '';
     final score = lead['score'] ?? 0;
     final status = normalizeLeadStatus(lead['status'] as String?);
-    final meta = _statusMeta(status);
+    final meta = dashboardLeadStatusMeta(status);
     final lang = lead['lang']?.toString() ?? 'pt';
     final scoreInt = score is int ? score : int.tryParse('$score') ?? 0;
 
@@ -787,142 +569,116 @@ class _LeadCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.gold.withOpacity(0.12),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Score circle
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.gold.withOpacity(0.3),
-              ),
-            ),
-            child: Center(
-              child: Text(
-                '$score%',
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.gold,
-                ),
-              ),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: AppColors.gold.withValues(alpha: 0.12),
             ),
           ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  nome,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.white,
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.3),
                   ),
                 ),
-                if (telefone.isNotEmpty)
-                  Text(
-                    telefone,
+                child: Center(
+                  child: Text(
+                    '$score%',
                     style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.greyLight,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.gold,
                     ),
                   ),
-                Text(
-                  formatLeadDate(lead['createdAt']),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      nome,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.white,
+                      ),
+                    ),
+                    if (telefone.isNotEmpty)
+                      Text(
+                        telefone,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.greyLight,
+                        ),
+                      ),
+                    Text(
+                      formatLeadDate(lead['createdAt']),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.grey.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: meta.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  meta.label,
                   style: TextStyle(
-                    fontSize: 11,
-                    color: AppColors.grey.withOpacity(0.8),
+                    fontSize: 10,
+                    color: meta.color,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (telefone.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  onPressed: () {
+                    openWhatsApp(
+                      phone: telefone,
+                      message: buildLeadWhatsAppMessage(
+                        lang: lang,
+                        score: scoreInt,
+                      ),
+                    );
+                  },
+                  icon: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.chat_outlined,
+                      size: 15,
+                      color: Color(0xFF25D366),
+                    ),
                   ),
                 ),
               ],
-            ),
+            ],
           ),
-
-          DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: status,
-              dropdownColor: AppColors.blackCard,
-              borderRadius: BorderRadius.circular(8),
-              icon: Icon(Icons.expand_more, size: 18, color: meta.color),
-              style: TextStyle(
-                fontSize: 11,
-                color: meta.color,
-                fontWeight: FontWeight.w600,
-              ),
-              items: _leadStatusOptions
-                  .map(
-                    (o) => DropdownMenuItem(
-                      value: o.value,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: o.color,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            o.label,
-                            style: TextStyle(color: o.color, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (v) {
-                if (v != null && v != status) onStatusChanged(v);
-              },
-            ),
-          ),
-
-          const SizedBox(width: 4),
-
-          // WhatsApp
-          if (telefone.isNotEmpty)
-            GestureDetector(
-              onTap: () {
-                openWhatsApp(
-                  phone: telefone,
-                  message: buildLeadWhatsAppMessage(
-                    lang: lang,
-                    score: scoreInt,
-                  ),
-                );
-              },
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF25D366).withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.chat_outlined,
-                  size: 15,
-                  color: Color(0xFF25D366),
-                ),
-              ),
-            ),
-        ],
-      ),
         ),
       ),
     );

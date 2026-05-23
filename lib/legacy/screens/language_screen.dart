@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hitlook/core/utils/phone_input_formatter.dart';
 import 'package:hitlook/core/utils/public_agent_slug.dart';
 import 'package:hitlook/legacy/screens/agent_login_screen.dart';
 import 'package:hitlook/legacy/screens/hitlook_splash_screen.dart';
@@ -1112,7 +1113,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'title': 'ANTES DE COMEÇAR',
       'desc': 'Precisamos de algumas informações para personalizar seu resultado.',
       'name': 'Nome completo', 'name_h': 'Como você se chama?',
-      'phone': 'Telefone / WhatsApp', 'phone_h': '+1 (305) 555-1234',
+      'phone': 'Telefone / WhatsApp', 'phone_h': '(305) 555-1234',
       'phone_help': 'Inclua o código do país. Ex: +1 para EUA, +55 para Brasil',
       'birth': 'Data de nascimento', 'birth_h': 'MM/DD/AAAA',
       'privacy': 'Suas informações são confidenciais e nunca serão compartilhadas sem sua autorização.',
@@ -1126,7 +1127,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'title': 'ANTES DE EMPEZAR',
       'desc': 'Necesitamos algunos datos para personalizar tu resultado.',
       'name': 'Nombre completo', 'name_h': '¿Cómo te llamas?',
-      'phone': 'Teléfono / WhatsApp', 'phone_h': '+1 (305) 555-1234',
+      'phone': 'Teléfono / WhatsApp', 'phone_h': '(305) 555-1234',
       'phone_help': 'Incluye el código de país. Ej: +1 para EE.UU., +55 para Brasil',
       'birth': 'Fecha de nacimiento', 'birth_h': 'MM/DD/AAAA',
       'privacy': 'Tu información es confidencial y nunca será compartida sin tu autorización.',
@@ -1140,7 +1141,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       'title': 'BEFORE WE START',
       'desc': 'We need some basic information to personalize your result.',
       'name': 'Full name', 'name_h': 'What is your name?',
-      'phone': 'Phone / WhatsApp', 'phone_h': '+1 (305) 555-1234',
+      'phone': 'Phone / WhatsApp', 'phone_h': '(305) 555-1234',
       'phone_help': 'Include country code. Ex: +1 for US, +55 for Brazil',
       'birth': 'Date of birth', 'birth_h': 'MM/DD/YYYY',
       'privacy': 'Your information is confidential and will never be shared without your authorization.',
@@ -1183,7 +1184,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           pageBuilder: (_, __, ___) => QuestionScreen(
             lang: widget.lang,
             nome: _nomeCtrl.text.trim(),
-            telefone: _telCtrl.text.trim(),
+            telefone: phoneForFirestore(_telCtrl.text),
             nascimento: _nascCtrl.text.trim(),
             agentId: widget.agentId,
           ),
@@ -1266,6 +1267,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       icon: Icons.phone_outlined,
                       tipo: TextInputType.phone,
                       erro: _t('e_phone'),
+                      inputFormatters: [PhoneInputFormatter()],
+                      minPhoneDigits: 10,
+                      lengthErro: widget.lang == 'en'
+                          ? 'Enter all 10 digits'
+                          : widget.lang == 'es'
+                              ? 'Escribe los 10 dígitos'
+                              : 'Digite os 10 dígitos',
                     ),
                     const SizedBox(height: 16),
                     _Campo(
@@ -1353,6 +1361,7 @@ class _Campo extends StatelessWidget {
   final String erro;
   final List<TextInputFormatter>? inputFormatters;
   final int? minLength;
+  final int? minPhoneDigits;
   final String? lengthErro;
   final String? helpText;
 
@@ -1365,6 +1374,7 @@ class _Campo extends StatelessWidget {
     required this.erro,
     this.inputFormatters,
     this.minLength,
+    this.minPhoneDigits,
     this.lengthErro,
     this.helpText,
   });
@@ -1389,6 +1399,10 @@ class _Campo extends StatelessWidget {
               color: AppColors.whiteWarm, fontSize: 15),
           validator: (v) {
             if (v == null || v.trim().isEmpty) return erro;
+            if (minPhoneDigits != null &&
+                phoneDigitsFromInput(v).length < minPhoneDigits!) {
+              return lengthErro ?? erro;
+            }
             if (minLength != null && v.trim().length < minLength!) {
               return lengthErro ?? erro;
             }
