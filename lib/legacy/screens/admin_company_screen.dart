@@ -149,6 +149,15 @@ class _AdminCompanyScreenState extends State<AdminCompanyScreen> {
                       );
                     }
 
+                    if (sellersSnap.hasError) {
+                      return const Center(
+                        child: Text(
+                          'Erro ao carregar agentes. Tente novamente.',
+                          style: TextStyle(color: AppColors.greyLight),
+                        ),
+                      );
+                    }
+
                     final sellers = sellersSnap.data ?? [];
 
                     return StreamBuilder<List<Lead>>(

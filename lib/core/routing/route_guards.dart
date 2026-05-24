@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/legacy/admin/admin_session.dart';
+import 'package:hitlook/legacy/admin/user_security.dart';
 
 bool _isPublicClientPath(String path) {
   if (path == RoutePaths.root) return true;
@@ -46,8 +47,14 @@ Future<String?> authRedirect(BuildContext context, GoRouterState state) async {
 
   if (!isLoggedIn) return null;
 
+  final mustChangePassword = await UserSecurity.mustChangePassword();
+  if (mustChangePassword && path != RoutePaths.sellerProfile) {
+    return RoutePaths.sellerProfile;
+  }
+
   // Already signed in — leave login screen (avoids stuck loading on /login).
   if (path == RoutePaths.login) {
+    if (mustChangePassword) return RoutePaths.sellerProfile;
     return AdminSession.postLoginRoute();
   }
 

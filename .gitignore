@@ -43,6 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+# Local-only Ana chat (API via Cloudflare Worker — copy from .example)
+lib/legacy/screens/chat_screen.dart
+
 # Seed scripts — secrets
 scripts/seed/.env
 scripts/seed/node_modules/

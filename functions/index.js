@@ -74,8 +74,8 @@ exports.createSellerAccount = onCall(
       throw new HttpsError("permission-denied", "Admin only");
     }
 
-    const { email, password, displayName, companyId } = request.data || {};
-    if (!email || !password || !displayName || !companyId) {
+    const { email, password, displayName, companyId, sellerId } = request.data || {};
+    if (!email || !password || !displayName || !companyId || !sellerId) {
       throw new HttpsError("invalid-argument", "Missing required fields");
     }
 
@@ -85,7 +85,22 @@ exports.createSellerAccount = onCall(
         password: String(password),
         displayName: String(displayName).trim(),
       });
-      logger.info("createSellerAccount OK", { uid: user.uid, companyId });
+
+      await db.collection("users").doc(user.uid).set(
+        {
+          email: String(email).trim(),
+          displayName: String(displayName).trim(),
+          role: "seller",
+          companyId: String(companyId),
+          sellerId: String(sellerId),
+          mustChangePassword: true,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      logger.info("createSellerAccount OK", { uid: user.uid, companyId, sellerId });
       return { uid: user.uid };
     } catch (e) {
       logger.error("createSellerAccount failed", e);

@@ -4,8 +4,8 @@
  *
  * Creates (by default, skip if exists):
  *   tenants/m4life
- *   companies/m4life-usa
- *   companies/m4life-usa/sellers/{sellerId}
+ *   companies/m4life
+ *   companies/m4life/sellers/{sellerId}
  *   seller_slugs/m4life
  *   users/{adminUid}  — only when ADMIN_UID or ADMIN_EMAIL is set
  *
@@ -37,7 +37,7 @@ const path = require('path');
 
 const DEFAULTS = {
   tenantId: 'm4life',
-  companyId: process.env.SEED_COMPANY_ID || 'm4life-usa',
+  companyId: process.env.SEED_COMPANY_ID || 'm4life',
   sellerId: process.env.SEED_SELLER_ID || 'seller-m4life-1',
   sellerSlug: process.env.SEED_SELLER_SLUG || 'm4life',
   projectId: process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || 'hitlook-app',

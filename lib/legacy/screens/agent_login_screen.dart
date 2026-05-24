@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/legacy/admin/admin_session.dart';
+import 'package:hitlook/legacy/admin/user_security.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
 class AgentLoginScreen extends StatefulWidget {
@@ -112,6 +113,12 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       );
 
       if (!mounted) return;
+      if (await UserSecurity.mustChangePassword()) {
+        if (!mounted) return;
+        context.go(RoutePaths.sellerProfile);
+        return;
+      }
+
       final route = await AdminSession.postLoginRoute();
       debugPrint('[HitLook:auth] reset+login OK → $route');
       context.go(route);
@@ -223,6 +230,14 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
       debugPrint('[HitLook:auth] Firebase Auth OK uid=$uid');
 
       if (!mounted) return;
+
+      if (await UserSecurity.mustChangePassword()) {
+        debugPrint('[HitLook:auth] mustChangePassword → /perfil');
+        setState(() => _loading = false);
+        if (!mounted) return;
+        context.go(RoutePaths.sellerProfile);
+        return;
+      }
 
       final route = await AdminSession.postLoginRoute();
       debugPrint('[HitLook:auth] navigating → $route');

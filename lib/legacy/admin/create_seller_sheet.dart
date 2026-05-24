@@ -150,6 +150,11 @@ class _CreateSellerSheetState extends State<_CreateSellerSheet> {
                 'Senha temporária: ${AppConfig.defaultSellerPassword}',
                 style: const TextStyle(fontSize: 12, color: AppColors.greyLight),
               ),
+              const SizedBox(height: 4),
+              const Text(
+                'No primeiro login o agente deve trocar a senha em /perfil.',
+                style: TextStyle(fontSize: 11, color: AppColors.grey),
+              ),
               const SizedBox(height: 20),
               Center(
                 child: GestureDetector(

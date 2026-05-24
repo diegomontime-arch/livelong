@@ -38,6 +38,7 @@ class CreateSellerService {
         'password': AppConfig.defaultSellerPassword,
         'displayName': displayName.trim(),
         'companyId': companyId,
+        'sellerId': slug.trim(),
       });
 
       final uid = authResult.data['uid'] as String?;
@@ -105,6 +106,7 @@ class CreateSellerService {
         'companyId': companyId,
         'sellerId': seller.id,
         'displayName': seller.displayName,
+        'mustChangePassword': true,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       },

@@ -208,6 +208,7 @@ async function main() {
     companyId: AGENT.companyId,
     sellerId: AGENT.sellerId,
     displayName: AGENT.displayName,
+    mustChangePassword: true,
   });
 
   await commitSet(token, `companies/${AGENT.companyId}/sellers/${AGENT.sellerId}`, {

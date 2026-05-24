@@ -1,9 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:hitlook/core/config/ana_proxy_config.dart';
+// Copie este arquivo para chat_screen.dart e configure localmente
+
 import 'dart:convert';
+
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
+
+/// Worker Anthropic — sem API key no cliente (sem header x-api-key).
+const _kAnaMessagesUrl = 'https://hitlook-ana-proxy.hitlook.workers.dev/v1/messages';
+const _kAnaModel = 'claude-sonnet-4-6';
 
 class ChatScreen extends StatefulWidget {
   final String lang;
@@ -165,12 +172,12 @@ YOU CANNOT:
       }
 
       final response = await http.post(
-        Uri.parse(AnaProxyConfig.messagesUrl),
+        Uri.parse(_kAnaMessagesUrl),
         headers: const {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'model': AnaProxyConfig.model,
+          'model': _kAnaModel,
           'max_tokens': 600,
           'system': _systemPrompt,
           'messages': msgs,

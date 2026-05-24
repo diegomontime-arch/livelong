@@ -182,6 +182,7 @@ service cloud.firestore {
           'companyId',
           'sellerId',
           'role',
+          'mustChangePassword',
           'createdAt',
           'updatedAt',
         ])
@@ -195,6 +196,11 @@ service cloud.firestore {
           !request.resource.data.diff(resource.data).affectedKeys()
             .hasAny(['companyId', 'sellerId'])
           || userSelfLinkValid()
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['mustChangePassword'])
+          || request.resource.data.mustChangePassword == false
         );
 
       allow delete: if false;

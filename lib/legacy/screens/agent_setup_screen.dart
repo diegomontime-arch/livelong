@@ -12,6 +12,7 @@ import 'package:hitlook/core/constants/firestore_paths.dart';
 import 'package:hitlook/data/models/seller.dart';
 import 'package:hitlook/core/utils/phone_input_formatter.dart';
 import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
+import 'package:hitlook/legacy/admin/user_security.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/widgets/flow_ux.dart';
@@ -46,6 +47,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
   bool _obscureNova = true;
   bool _obscureConfirm = true;
   String _publicLinkId = '';
+  bool _mustChangePassword = false;
 
   @override
   void initState() {
@@ -71,6 +73,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
     if (uid == null) return;
     if (!silent && mounted) setState(() => _loading = true);
     try {
+      final mustChange = await UserSecurity.mustChangePassword();
       final doc = await FirebaseFirestore.instance
           .collection('agents')
           .doc(uid)
@@ -109,6 +112,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
 
         if (mounted) {
           setState(() {
+            _mustChangePassword = mustChange;
             _fotoUrl = url;
             _publicLinkId = publicId;
             if (storageBytes != null && storageBytes.isNotEmpty) {
@@ -120,7 +124,12 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
         }
       } else {
         debugPrint('[HitLook:Profile] agents/$uid doc missing');
-        if (mounted) setState(() => _publicLinkId = publicId);
+        if (mounted) {
+          setState(() {
+            _mustChangePassword = mustChange;
+            _publicLinkId = publicId;
+          });
+        }
       }
     } catch (e, st) {
       debugPrint('[HitLook:Profile] load FAILED: $e\n$st');
@@ -380,9 +389,11 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
       );
       await user.reauthenticateWithCredential(cred);
       await user.updatePassword(nova);
+      await UserSecurity.clearMustChangePassword(user.uid);
       _senhaAtualCtrl.clear();
       _senhaNovaCtrl.clear();
       _senhaConfirmCtrl.clear();
+      if (mounted) setState(() => _mustChangePassword = false);
       _snack('Senha alterada com sucesso!');
     } on FirebaseAuthException catch (e) {
       final msg = switch (e.code) {
@@ -473,23 +484,52 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.black,
-      body: WatermarkBackground(
-        child: SafeArea(
-          child: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.gold))
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 16),
-                        FlowBackButton(onPressed: () => context.go('/dashboard')),
-                        const SizedBox(height: 24),
+    return PopScope(
+      canPop: !_mustChangePassword,
+      child: Scaffold(
+        backgroundColor: AppColors.black,
+        body: WatermarkBackground(
+          child: SafeArea(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(color: AppColors.gold))
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 16),
+                          if (!_mustChangePassword)
+                            FlowBackButton(
+                              onPressed: () => context.go('/dashboard'),
+                            )
+                          else
+                            const SizedBox(height: 40),
+                          if (_mustChangePassword) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: AppColors.gold.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppColors.gold.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              child: const Text(
+                                'Por segurança, defina uma nova senha antes de continuar.',
+                                style: TextStyle(
+                                  color: AppColors.gold,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 24),
 
                         const M4LifeLogo(fontSize: 18, showTagline: false),
 
@@ -829,6 +869,7 @@ class _AgentSetupScreenState extends State<AgentSetupScreen> {
                     ),
                   ),
                 ),
+          ),
         ),
       ),
     );

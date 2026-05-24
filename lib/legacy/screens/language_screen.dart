@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/utils/phone_input_formatter.dart';
 import 'package:hitlook/core/utils/public_agent_slug.dart';
-import 'package:hitlook/legacy/screens/agent_login_screen.dart';
 import 'package:hitlook/legacy/screens/hitlook_splash_screen.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/questions_screen.dart';

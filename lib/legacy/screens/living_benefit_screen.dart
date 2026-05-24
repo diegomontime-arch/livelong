@@ -112,10 +112,6 @@ class _LivingBenefitScreenState extends State<LivingBenefitScreen>
     }
   }
 
-  String _pageLabel() {
-    return '${_currentCard + 1} / ${_cards.length}';
-  }
-
   @override
   void initState() {
     super.initState();

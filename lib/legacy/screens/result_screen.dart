@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hitlook/core/utils/whatsapp_utils.dart';
-import 'living_benefit_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/chat_screen.dart';
@@ -184,7 +183,16 @@ class _ResultScreenState extends State<ResultScreen>
         });
       }
     } catch (e) {
-      // ignora erro silenciosamente
+      debugPrint('[HitLook:Lead] ERRO ao salvar lead: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erro ao registrar seus dados. Tente novamente.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -330,18 +338,78 @@ class _ResultScreenState extends State<ResultScreen>
 
     if (kIsWeb) {
       final opened = openWhatsAppImmediately(phone: phone, message: msg);
-      if (!opened && mounted) _mostrarErroWhatsApp();
+      if (!opened && mounted) {
+        _mostrarErroWhatsApp();
+      } else if (mounted) {
+        _showWhatsAppConfirmation();
+      }
       return;
     }
 
     setState(() => _whatsAppLoading = true);
     openWhatsApp(phone: phone, message: msg).then((opened) {
-      if (!opened && mounted) _mostrarErroWhatsApp();
+      if (!opened && mounted) {
+        _mostrarErroWhatsApp();
+      } else if (mounted) {
+        _showWhatsAppConfirmation();
+      }
     }).catchError((_) {
       if (mounted) _mostrarErroWhatsApp();
     }).whenComplete(() {
       if (mounted) setState(() => _whatsAppLoading = false);
     });
+  }
+
+  void _showWhatsAppConfirmation() {
+    final lang = widget.lang;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.blackCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: AppColors.gold.withValues(alpha: 0.3)),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle_outline,
+              color: AppColors.gold,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              lang == 'en'
+                  ? 'Your consultant will contact you shortly!'
+                  : lang == 'es'
+                      ? '¡Tu consultor se pondrá en contacto pronto!'
+                      : 'Seu consultor entrará em contato em breve!',
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              lang == 'en'
+                  ? 'Check your WhatsApp'
+                  : lang == 'es'
+                      ? 'Revisa tu WhatsApp'
+                      : 'Verifique seu WhatsApp',
+              style: const TextStyle(
+                color: AppColors.greyLight,
+                fontSize: 13,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _mostrarErroWhatsApp() {
