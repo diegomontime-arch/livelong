@@ -83,21 +83,216 @@ Future<bool> openWhatsApp({
   return false;
 }
 
+String _whatsappLang(String lang) {
+  if (lang == 'es' || lang == 'en') return lang;
+  return 'pt';
+}
+
+String _formatDependentes(String lang, dynamic raw) {
+  final v = raw is int ? raw : int.tryParse('$raw');
+  return switch (_whatsappLang(lang)) {
+    'es' => switch (v) {
+        0 => 'Solo yo',
+        1 => '1 a 2 personas',
+        2 => '3 a 4 personas',
+        3 => '5 o más',
+        _ => 'No indicado',
+      },
+    'en' => switch (v) {
+        0 => 'Just me',
+        1 => '1 to 2 people',
+        2 => '3 to 4 people',
+        3 => '5 or more',
+        _ => 'Not specified',
+      },
+    _ => switch (v) {
+        0 => 'Só eu mesmo',
+        1 => '1 a 2 pessoas',
+        2 => '3 a 4 pessoas',
+        3 => '5 ou mais',
+        _ => 'Não informado',
+      },
+  };
+}
+
+String _formatRenda(String lang, dynamic raw) {
+  final v = raw is int ? raw : int.tryParse('$raw');
+  return switch (_whatsappLang(lang)) {
+    'es' => switch (v) {
+        1 => 'Hasta \$2,000',
+        2 => '\$2,000 – \$4,000',
+        3 => '\$4,000 – \$7,000',
+        4 => 'Más de \$7,000',
+        _ => 'No indicado',
+      },
+    'en' => switch (v) {
+        1 => 'Up to \$2,000',
+        2 => '\$2,000 – \$4,000',
+        3 => '\$4,000 – \$7,000',
+        4 => 'Above \$7,000',
+        _ => 'Not specified',
+      },
+    _ => switch (v) {
+        1 => 'Até \$2.000',
+        2 => '\$2.000 – \$4.000',
+        3 => '\$4.000 – \$7.000',
+        4 => 'Acima de \$7.000',
+        _ => 'Não informado',
+      },
+  };
+}
+
+String _formatSeguro(String lang, dynamic raw) {
+  final v = raw is int ? raw : int.tryParse('$raw');
+  return switch (_whatsappLang(lang)) {
+    'es' => switch (v) {
+        0 => 'No',
+        1 => 'Sí, cobertura básica',
+        2 => 'Sí, por el trabajo',
+        3 => 'Sí, cobertura completa',
+        _ => 'No indicado',
+      },
+    'en' => switch (v) {
+        0 => 'No',
+        1 => 'Yes, basic coverage',
+        2 => 'Yes, through work',
+        3 => 'Yes, full coverage',
+        _ => 'Not specified',
+      },
+    _ => switch (v) {
+        0 => 'Não',
+        1 => 'Sim, cobertura básica',
+        2 => 'Sim, pelo trabalho',
+        3 => 'Sim, cobertura completa',
+        _ => 'Não informado',
+      },
+  };
+}
+
+String _formatPreocupacao(String lang, dynamic raw) {
+  final key = raw?.toString() ?? '';
+  return switch (_whatsappLang(lang)) {
+    'es' => switch (key) {
+        'moradia' => 'Pagar alquiler o hipoteca',
+        'educacao' => 'Educación de los hijos',
+        'dividas' => 'Deudas y facturas',
+        'familia' => 'Futuro de la familia en general',
+        _ => 'No indicado',
+      },
+    'en' => switch (key) {
+        'moradia' => 'Paying rent or mortgage',
+        'educacao' => "Children's education",
+        'dividas' => 'Debts and bills',
+        'familia' => "Family's future in general",
+        _ => 'Not specified',
+      },
+    _ => switch (key) {
+        'moradia' => 'Pagar o aluguel ou hipoteca',
+        'educacao' => 'Educação dos filhos',
+        'dividas' => 'Dívidas e contas',
+        'familia' => 'Futuro da família em geral',
+        _ => 'Não informado',
+      },
+  };
+}
+
+String _agentOutreachMessage({
+  required String lang,
+  required int score,
+  String? nome,
+}) {
+  final first = nome?.trim().split(' ').firstWhere(
+        (p) => p.isNotEmpty,
+        orElse: () => '',
+      ) ??
+      '';
+  final greeting = first.isNotEmpty ? ' $first' : '';
+
+  if (lang == 'es') {
+    return '¡Hola$greeting! Vi tu diagnóstico de protección familiar '
+        '($score%). Soy tu consultor M4LIFE — ¿podemos hablar?';
+  }
+  if (lang == 'en') {
+    return 'Hi$greeting! I saw your family protection diagnosis '
+        '($score%). I\'m your M4LIFE consultant — can we talk?';
+  }
+  return 'Olá$greeting! Vi seu diagnóstico de proteção familiar '
+      '($score%). Sou seu consultor M4LIFE — podemos conversar?';
+}
+
+String _prospectToAgentMessage({
+  required String lang,
+  required int score,
+  required String nome,
+  required String telefone,
+  required Map<String, dynamic> answers,
+}) {
+  final l = _whatsappLang(lang);
+  final dependentes = _formatDependentes(l, answers['dependentes']);
+  final renda = _formatRenda(l, answers['renda']);
+  final seguro = _formatSeguro(l, answers['seguro']);
+  final preocupacao = _formatPreocupacao(l, answers['preocupacao']);
+
+  if (l == 'es') {
+    return '🔔 ¡Hola! Acabo de hacer el diagnóstico de protección familiar por HitLook.\n\n'
+        '👤 Mi nombre: $nome\n'
+        '📱 Mi teléfono: $telefone\n'
+        '⭐ Mi score: $score% de protección\n\n'
+        '📊 Mi perfil:\n'
+        '- Dependientes: $dependentes\n'
+        '- Ingreso mensual: $renda\n'
+        '- Tengo seguro actual: $seguro\n'
+        '- Mi mayor preocupación: $preocupacao\n\n'
+        'Me gustaría saber más sobre las opciones disponibles para mi familia.';
+  }
+  if (l == 'en') {
+    return '🔔 Hi! I just completed the family protection diagnosis on HitLook.\n\n'
+        '👤 My name: $nome\n'
+        '📱 My phone: $telefone\n'
+        '⭐ My score: $score% protection level\n\n'
+        '📊 My profile:\n'
+        '- Dependents: $dependentes\n'
+        '- Monthly income: $renda\n'
+        '- Current life insurance: $seguro\n'
+        '- My biggest concern: $preocupacao\n\n'
+        'I would like to learn more about the options available for my family.';
+  }
+  return '🔔 Olá! Acabei de fazer o diagnóstico de proteção familiar pelo HitLook.\n\n'
+      '👤 Meu nome: $nome\n'
+      '📱 Meu telefone: $telefone\n'
+      '⭐ Meu score: $score% de proteção\n\n'
+      '📊 Meu perfil:\n'
+      '- Dependentes: $dependentes\n'
+      '- Renda mensal: $renda\n'
+      '- Tenho seguro atual: $seguro\n'
+      '- Minha maior preocupação: $preocupacao\n\n'
+      'Gostaria de saber mais sobre as opções disponíveis para minha família.';
+}
+
+/// WhatsApp message text. Use [prospectToAgent] when the prospect contacts the agent.
 String buildLeadWhatsAppMessage({
   required String lang,
   required int score,
+  String? nome,
+  String? telefone,
+  Map<String, dynamic>? answers,
+  bool prospectToAgent = false,
 }) {
-  if (lang == 'es') {
-    return '¡Hola! Acabo de hacer el diagnóstico de protección familiar y '
-        'recibí un score de $score%. Me gustaría saber más sobre las '
-        'opciones disponibles.';
+  if (!prospectToAgent) {
+    return _agentOutreachMessage(lang: lang, score: score, nome: nome);
   }
-  if (lang == 'en') {
-    return 'Hi! I just completed the family protection diagnosis and '
-        'received a score of $score%. I\'d like to know more about the '
-        'available options for my family.';
+
+  final name = nome?.trim() ?? '';
+  final phone = telefone?.trim() ?? '';
+  if (name.isEmpty || phone.isEmpty) {
+    return _agentOutreachMessage(lang: lang, score: score, nome: nome);
   }
-  return 'Olá! Acabei de fazer o diagnóstico de proteção familiar e recebi '
-      'um score de $score%. Gostaria de saber mais sobre as opções '
-      'disponíveis para minha família.';
+
+  return _prospectToAgentMessage(
+    lang: lang,
+    score: score,
+    nome: name,
+    telefone: phone,
+    answers: answers ?? const {},
+  );
 }

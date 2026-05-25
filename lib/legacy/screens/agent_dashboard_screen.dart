@@ -796,6 +796,7 @@ class _LeadCard extends StatelessWidget {
                       message: buildLeadWhatsAppMessage(
                         lang: lang,
                         score: scoreInt,
+                        nome: nome,
                       ),
                     );
                   },

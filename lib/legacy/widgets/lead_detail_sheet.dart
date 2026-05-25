@@ -214,6 +214,7 @@ class _LeadDetailSheetState extends State<LeadDetailSheet> {
                       message: buildLeadWhatsAppMessage(
                         lang: lang,
                         score: scoreInt,
+                        nome: nome,
                       ),
                     );
                   },

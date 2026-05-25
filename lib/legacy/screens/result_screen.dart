@@ -334,7 +334,14 @@ class _ResultScreenState extends State<ResultScreen>
       return;
     }
 
-    final msg = buildLeadWhatsAppMessage(lang: widget.lang, score: _score);
+    final msg = buildLeadWhatsAppMessage(
+      lang: widget.lang,
+      score: _score,
+      nome: widget.nome,
+      telefone: widget.telefone,
+      answers: widget.answers,
+      prospectToAgent: true,
+    );
 
     if (kIsWeb) {
       final opened = openWhatsAppImmediately(phone: phone, message: msg);
