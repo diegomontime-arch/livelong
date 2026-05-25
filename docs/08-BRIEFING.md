@@ -67,6 +67,19 @@ Toda modificação → flutter build web --release && firebase deploy --only hos
 4. WhatsApp com mensagem pré-preenchida
 5. Stripe pagamento
 
+## Ícones e branding por tenant (multi-tenant)
+
+- Ícones web/PWA são gerados a partir de `assets/tenants/{companyId}/logo.jpg` (ou `.png`).
+- Tenant ativo hoje: **m4life** (M4LIFE USA).
+- Futuro: `companies/{companyId}.iconUrl` no Firestore; por ora o build usa a pasta local.
+
+Para nova empresa:
+
+1. Adicionar `assets/tenants/{companyId}/logo.jpg`
+2. Rodar `python3 scripts/generate_web_icons.py --tenant={companyId}`
+3. Ajustar `web/manifest.json` e `web/index.html` se necessário
+4. `./save.sh` + deploy
+
 ## O que NÃO fazer
 - Não criar nova estrutura sem alinhar com o time
 - Não subir chat_screen.dart para o git (tem API key)

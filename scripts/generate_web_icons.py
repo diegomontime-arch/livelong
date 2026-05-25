@@ -1,123 +1,159 @@
 #!/usr/bin/env python3
-"""Generate HitLook web icons and Open Graph image."""
+"""
+Generate PWA / web icons from a tenant logo (multi-tenant ready).
+
+Usage:
+  python3 scripts/generate_web_icons.py --tenant=m4life
+
+Place logo at assets/tenants/{tenant}/logo.jpg (or .png / .jpeg).
+Falls back to web/icons/og-image.png (center crop) if missing.
+"""
 
 from __future__ import annotations
 
+import argparse
 import os
+import shutil
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 WEB = ROOT / "web"
 ICONS = WEB / "icons"
+TENANTS = ROOT / "assets" / "tenants"
 
-GOLD = (212, 175, 55)
 BLACK = (0, 0, 0)
 
-
-def _font(size: int, bold: bool = True) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-    candidates = [
-        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-        "/System/Library/Fonts/Supplemental/Arial.ttf",
-        "/Library/Fonts/Arial Bold.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "C:\\Windows\\Fonts\\arialbd.ttf",
-    ]
-    if not bold:
-        candidates.insert(0, "/System/Library/Fonts/Supplemental/Arial.ttf")
-    for path in candidates:
-        if os.path.isfile(path):
-            return ImageFont.truetype(path, size)
-    return ImageFont.load_default()
+ICON_OUTPUTS = {
+    "web/favicon.png": 32,
+    "web/favicon-48.png": 48,
+    "web/icons/Icon-192.png": 192,
+    "web/icons/Icon-512.png": 512,
+    "web/icons/Icon-maskable-192.png": 192,
+    "web/icons/Icon-maskable-512.png": 512,
+}
 
 
-def create_app_icon(size: int, *, maskable: bool = False) -> Image.Image:
-    img = Image.new("RGB", (size, size), color=BLACK)
-    draw = ImageDraw.Draw(img)
-    margin = size // 6 if maskable else size // 8
-    draw.ellipse(
-        [margin, margin, size - margin, size - margin],
-        outline=GOLD,
-        width=max(2, size // 20),
-    )
-    font = _font(size // 3)
-    draw.text((size // 2, size // 2), "HL", fill=GOLD, anchor="mm", font=font)
-    return img
+def resolve_logo_path(tenant: str) -> Path | None:
+    base = TENANTS / tenant
+    for name in ("logo.jpg", "logo.jpeg", "logo.png", "logo.JPG", "logo.PNG"):
+        path = base / name
+        if path.is_file():
+            return path
+    return None
 
 
-def create_og_image() -> Image.Image:
-    w, h = 1200, 630
-    img = Image.new("RGB", (w, h), color=BLACK)
-    draw = ImageDraw.Draw(img)
-
-    # Decorative rings
-    cx, cy = w // 2, h // 2 - 20
-    for radius, width in [(220, 4), (260, 2)]:
-        draw.ellipse(
-            [cx - radius, cy - radius, cx + radius, cy + radius],
-            outline=GOLD,
-            width=width,
+def bootstrap_logo_from_og(tenant: str) -> Path:
+    """Crop M4LIFE title area from og-image when no logo file exists."""
+    og_path = ICONS / "og-image.png"
+    if not og_path.is_file():
+        raise FileNotFoundError(
+            f"Missing {og_path}. Add assets/tenants/{tenant}/logo.jpg manually."
         )
 
-    title_font = _font(72)
-    sub_font = _font(36, bold=False)
-    brand_font = _font(28)
+    og = Image.open(og_path).convert("RGB")
+    w, h = og.size
+    side = min(w, h, 600)
+    cx, cy = w // 2, int(h * 0.38)
+    left = max(0, cx - side // 2)
+    top = max(0, cy - side // 2)
+    crop = og.crop((left, top, min(w, left + side), min(h, top + side)))
 
-    draw.text((cx, cy - 30), "M4LIFE USA", fill=GOLD, anchor="mm", font=title_font)
-    draw.text(
-        (cx, cy + 50),
-        "Proteção Familiar",
-        fill=(200, 200, 200),
-        anchor="mm",
-        font=sub_font,
-    )
-    draw.text(
-        (cx, cy + 120),
-        "Descubra seu nível de proteção familiar",
-        fill=(150, 150, 150),
-        anchor="mm",
-        font=sub_font,
-    )
+    out_dir = TENANTS / tenant
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "logo.png"
+    crop.save(out_path, "PNG", optimize=True)
+    print(f"Bootstrap logo from og-image → {out_path}")
+    return out_path
 
-    # HitLook badge
-    badge_size = 96
-    bx, by = 48, 48
-    draw.ellipse(
-        [bx, by, bx + badge_size, by + badge_size],
-        outline=GOLD,
-        width=3,
-    )
-    draw.text(
-        (bx + badge_size // 2, by + badge_size // 2),
-        "HL",
-        fill=GOLD,
-        anchor="mm",
-        font=_font(32),
-    )
-    draw.text((bx + badge_size + 16, by + 34), "HitLook", fill=GOLD, font=brand_font)
 
-    return img
+def ensure_tenant_logo(tenant: str, source_upload: str | None) -> Path:
+    if source_upload:
+        src = Path(source_upload)
+        if not src.is_file():
+            raise FileNotFoundError(f"Logo upload not found: {src}")
+        out_dir = TENANTS / tenant
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ext = src.suffix.lower() or ".jpg"
+        dest = out_dir / f"logo{ext if ext in {'.jpg', '.jpeg', '.png'} else '.jpg'}"
+        shutil.copy2(src, dest)
+        print(f"Copied upload → {dest}")
+        return dest
+
+    existing = resolve_logo_path(tenant)
+    if existing:
+        return existing
+
+    if tenant != "m4life":
+        default = resolve_logo_path("default")
+        if default:
+            out_dir = TENANTS / tenant
+            out_dir.mkdir(parents=True, exist_ok=True)
+            dest = out_dir / "logo.png"
+            shutil.copy2(default, dest)
+            print(f"Using default logo → {dest}")
+            return dest
+
+    return bootstrap_logo_from_og(tenant)
+
+
+def create_icon_from_logo(
+    logo_path: Path,
+    size: int,
+    output_path: Path,
+    *,
+    maskable: bool = False,
+) -> None:
+    logo = Image.open(logo_path).convert("RGB")
+
+    icon = Image.new("RGB", (size, size), color=BLACK)
+
+    margin = size // 6 if maskable else size // 8
+    max_size = size - (margin * 2)
+    logo_copy = logo.copy()
+    logo_copy.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+
+    x = (size - logo_copy.width) // 2
+    y = (size - logo_copy.height) // 2
+    icon.paste(logo_copy, (x, y))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    icon.save(output_path, "PNG", optimize=True)
+    print(f"Criado: {output_path} ({size}x{size})")
+
+
+def generate_icons(tenant: str, source_upload: str | None) -> None:
+    logo_path = ensure_tenant_logo(tenant, source_upload)
+
+    for rel_path, size in ICON_OUTPUTS.items():
+        out = ROOT / rel_path
+        maskable = "maskable" in rel_path
+        create_icon_from_logo(
+            logo_path,
+            size,
+            out,
+            maskable=maskable,
+        )
+
+    print(f"\nÍcones gerados para tenant '{tenant}'!")
 
 
 def main() -> None:
-    ICONS.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description="Generate web icons from tenant logo")
+    parser.add_argument(
+        "--tenant",
+        default="m4life",
+        help="Tenant companyId (folder under assets/tenants/)",
+    )
+    parser.add_argument(
+        "--source",
+        default=None,
+        help="Optional path to logo image (e.g. upload JPEG)",
+    )
+    args = parser.parse_args()
 
-    for size in (192, 512):
-        icon = create_app_icon(size)
-        icon.save(ICONS / f"Icon-{size}.png")
-        create_app_icon(size, maskable=True).save(ICONS / f"Icon-maskable-{size}.png")
-
-    create_app_icon(32).save(WEB / "favicon.png")
-    create_app_icon(48).save(WEB / "favicon-48.png")
-
-    og = create_og_image()
-    og.save(ICONS / "og-image.png", optimize=True)
-
-    print("Generated:")
-    print(f"  {WEB / 'favicon.png'}")
-    for p in sorted(ICONS.glob("*.png")):
-        print(f"  {p}")
+    generate_icons(args.tenant, args.source)
 
 
 if __name__ == "__main__":
