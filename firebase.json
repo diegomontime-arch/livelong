@@ -15,6 +15,20 @@
         "source": "**",
         "destination": "/index.html"
       }
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(html|htm)",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" }
+        ]
+      },
+      {
+        "source": "/+(privacy|privacy.pt|privacy.es|terms|terms.pt|terms.es).html",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=3600" }
+        ]
+      }
     ]
   },
   "flutter": {
@@ -30,7 +44,7 @@
         "default": {
           "projectId": "hitlook-app",
           "appId": "1:807145542991:ios:8f54c4325326d8cac2a13a",
-          "uploadDebugSymbols": false,
+          "uploadDebugSymbols": true,
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
       },

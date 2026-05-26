@@ -575,7 +575,26 @@ class _LanguageScreenState extends State<LanguageScreen>
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+
+                    // Regulatory disclaimer — visible to the prospect
+                    // (planning/LEGAL.md §6, planning/APPLE_RELEASE.md §2.4).
+                    Padding(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'Educational tool. Not insurance advice. '
+                        'Recommendations come from your licensed agent.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 10,
+                          height: 1.35,
+                          color: AppColors.grey.withOpacity(0.75),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
 
                     // Botão área do agente
                     GestureDetector(

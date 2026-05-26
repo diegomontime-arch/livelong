@@ -95,6 +95,15 @@ YOU CANNOT:
     }
   }
 
+  /// Sugestões educacionais para iniciar a conversa com a Ana.
+  ///
+  /// **Nota legal (LEGAL.md §2.2):** evitamos sugestões que induzam o
+  /// prospect a compartilhar dados de saúde (ex: "Tengo una condición
+  /// preexistente"). Dados médicos são classificados como Sensitive PII
+  /// sob CCPA/CPRA e como "nonpublic personal health information" sob
+  /// NAIC Model 670 (adotado por FL em §626.9651). Saúde deve ser
+  /// discutida com o agente licenciado por canal apropriado, não com
+  /// a assistente educacional.
   List<String> get _suggestions {
     switch (widget.lang) {
       case 'es':
@@ -102,21 +111,21 @@ YOU CANNOT:
           '¿Qué es el beneficio en vida?',
           'Term life vs Whole life',
           '¿Cuánto cuesta en promedio?',
-          'Tengo una condición preexistente',
+          '¿Cómo elijo la cobertura adecuada?',
         ];
       case 'en':
         return [
           'What is a living benefit?',
           'Term life vs Whole life',
           'How much does it cost on average?',
-          'I have a pre-existing condition',
+          'How do I choose the right coverage?',
         ];
       default:
         return [
           'O que é benefício em vida?',
           'Term life vs Whole life',
           'Quanto custa em média?',
-          'Tenho pré-existência',
+          'Como escolher a cobertura ideal?',
         ];
     }
   }
@@ -142,6 +151,19 @@ YOU CANNOT:
       case 'es': return 'Consultor';
       case 'en': return 'Consultant';
       default: return 'Consultor';
+    }
+  }
+
+  /// Regulatory disclaimer shown directly under the Ana header
+  /// (planning/LEGAL.md §6, planning/RISKS.md R1).
+  String _disclaimerText() {
+    switch (widget.lang) {
+      case 'es':
+        return 'Educación financiera general. No es asesoramiento de seguros.';
+      case 'en':
+        return 'General financial education. Not insurance advice.';
+      default:
+        return 'Educação financeira geral. Não é aconselhamento de seguros.';
     }
   }
 
@@ -359,6 +381,24 @@ YOU CANNOT:
                       ),
                     ),
                   ],
+                ),
+              ),
+
+              // ── DISCLAIMER REGULATÓRIO ─────
+              // Visível e sempre presente; obrigatório por LEGAL.md §6.
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 8),
+                color: AppColors.black.withValues(alpha: 0.6),
+                child: Text(
+                  _disclaimerText(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 10,
+                    height: 1.3,
+                    color: AppColors.grey.withValues(alpha: 0.85),
+                  ),
                 ),
               ),
 

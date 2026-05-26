@@ -6,6 +6,21 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- Privacy usage descriptions (Info.plist required by iOS 10+) -->
+	<!-- See planning/APPLE_RELEASE.md §2.2 -->
+	<key>NSCameraUsageDescription</key>
+	<string>HitLook needs camera access so you can add a profile photo as a licensed agent.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>HitLook accesses your photo library so you can choose a profile photo as a licensed agent.</string>
+	<!-- App Store: declares the app does not use non-exempt encryption.
+	     Avoids the export compliance questionnaire on every submission. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- Declared schemes for url_launcher canLaunch checks (WhatsApp deep link). -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>whatsapp</string>
+	</array>
 	<key>CFBundleDisplayName</key>
 	<string>Livelong</string>
 	<key>CFBundleExecutable</key>

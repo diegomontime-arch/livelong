@@ -1,6 +1,6 @@
-const functions = require("firebase-functions");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const https = require("https");
@@ -11,53 +11,155 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-exports.anthropicProxy = functions.https.onRequest((req, res) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type");
+// Anthropic API key — Secret Manager (replaces deprecated functions.config()).
+// Set via: firebase functions:secrets:set ANTHROPIC_API_KEY
+// See planning/SECURITY.md S9 and planning/FUNCTIONS_AUDIT.md §F2/§F9.
+const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
 
-  if (req.method === "OPTIONS") {
-    res.status(204).send("");
-    return;
-  }
+// Origin allowlist for the anthropicProxy fallback function (paranoia
+// in addition to App Check). See planning/SECURITY.md S7.
+const ANTHROPIC_PROXY_ALLOWED_ORIGINS = new Set([
+  "https://hitlook-app.web.app",
+  "https://hitlook-app.firebaseapp.com",
+  "http://localhost:8080",
+]);
 
-  if (req.method !== "POST") {
-    res.status(405).send("Method Not Allowed");
-    return;
-  }
+exports.anthropicProxy = onRequest(
+  {
+    region: "us-central1",
+    secrets: [ANTHROPIC_API_KEY],
+    cors: false, // we handle CORS manually with the allowlist below
+  },
+  (req, res) => {
+    const origin = req.headers.origin || "";
+    const corsOrigin = ANTHROPIC_PROXY_ALLOWED_ORIGINS.has(origin)
+      ? origin
+      : "null";
 
-  const apiKey = functions.config().anthropic?.key;
-  const body = JSON.stringify(req.body);
+    res.set("Access-Control-Allow-Origin", corsOrigin);
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    res.set("Vary", "Origin");
 
-  const options = {
-    hostname: "api.anthropic.com",
-    path: "/v1/messages",
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "Content-Length": Buffer.byteLength(body),
-    },
-  };
+    if (req.method === "OPTIONS") {
+      res.status(204).send("");
+      return;
+    }
 
-  const proxyReq = https.request(options, (proxyRes) => {
-    let data = "";
-    proxyRes.on("data", (chunk) => (data += chunk));
-    proxyRes.on("end", () => {
-      res.status(proxyRes.statusCode).send(data);
+    if (req.method !== "POST") {
+      res.status(405).send("Method Not Allowed");
+      return;
+    }
+
+    if (!ANTHROPIC_PROXY_ALLOWED_ORIGINS.has(origin)) {
+      logger.warn("anthropicProxy rejected origin", { origin });
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    const apiKey = ANTHROPIC_API_KEY.value();
+    if (!apiKey) {
+      logger.error("anthropicProxy: ANTHROPIC_API_KEY not configured");
+      res.status(500).json({ error: "Not configured" });
+      return;
+    }
+
+    const body = JSON.stringify(req.body);
+
+    const options = {
+      hostname: "api.anthropic.com",
+      path: "/v1/messages",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Length": Buffer.byteLength(body),
+      },
+      timeout: 30_000,
+    };
+
+    const proxyReq = https.request(options, (proxyRes) => {
+      let data = "";
+      proxyRes.on("data", (chunk) => (data += chunk));
+      proxyRes.on("end", () => {
+        res.status(proxyRes.statusCode).send(data);
+      });
     });
-  });
 
-  proxyReq.on("error", (e) => {
-    res.status(500).send({ error: e.message });
-  });
+    proxyReq.on("timeout", () => {
+      proxyReq.destroy(new Error("Anthropic upstream timeout"));
+    });
 
-  proxyReq.write(body);
-  proxyReq.end();
-});
+    proxyReq.on("error", (e) => {
+      logger.error("anthropicProxy upstream error", e);
+      res.status(502).json({ error: e.message });
+    });
+
+    proxyReq.write(body);
+    proxyReq.end();
+  },
+);
 
 const LANG_LABEL = { pt: "Português", es: "Español", en: "English" };
+
+// Localized strings for the lead notification email (planning B6).
+// Keys: pt (default + pt-br), es, en. Falls back to pt if unknown.
+const EMAIL_I18N = {
+  pt: {
+    subject: (nome) => `Novo lead HitLook: ${nome}`,
+    heading: "Novo lead HitLook",
+    fields: {
+      nome: "Nome",
+      telefone: "Telefone",
+      score: "Score",
+      idioma: "Idioma",
+    },
+    intro: "Você recebeu um novo lead no HitLook.",
+    cta: "Acesse seu painel:",
+    ctaLink: "Abrir painel",
+    disclaimer:
+      "HitLook é uma ferramenta educacional. Recomendações de seguros devem partir do agente licenciado.",
+  },
+  es: {
+    subject: (nome) => `Nuevo lead HitLook: ${nome}`,
+    heading: "Nuevo lead HitLook",
+    fields: {
+      nome: "Nombre",
+      telefone: "Teléfono",
+      score: "Score",
+      idioma: "Idioma",
+    },
+    intro: "Has recibido un nuevo lead en HitLook.",
+    cta: "Accede a tu panel:",
+    ctaLink: "Abrir panel",
+    disclaimer:
+      "HitLook es una herramienta educativa. Las recomendaciones de seguros deben provenir del agente licenciado.",
+  },
+  en: {
+    subject: (nome) => `New HitLook lead: ${nome}`,
+    heading: "New HitLook lead",
+    fields: {
+      nome: "Name",
+      telefone: "Phone",
+      score: "Score",
+      idioma: "Language",
+    },
+    intro: "You have a new lead on HitLook.",
+    cta: "Open your dashboard:",
+    ctaLink: "Open dashboard",
+    disclaimer:
+      "HitLook is an educational tool. Insurance recommendations must come from the licensed agent.",
+  },
+};
+
+function resolveEmailLang(lead) {
+  const raw = (lead && (lead.lang || lead.locale) || "").toString().toLowerCase();
+  if (raw.startsWith("es")) return "es";
+  if (raw.startsWith("en")) return "en";
+  if (raw.startsWith("pt")) return "pt";
+  return "pt";
+}
 
 /**
  * Admin creates seller Auth account + returns uid (password set server-side).
@@ -136,22 +238,28 @@ exports.notifyAgentOnNewLead = onDocumentCreated(
   const score = lead.score != null ? `${lead.score}%` : "—";
   const lang = LANG_LABEL[lead.lang] || lead.lang || "—";
 
-  const subject = `Novo lead HitLook: ${nome}`;
+  const langKey = resolveEmailLang(lead);
+  const t = EMAIL_I18N[langKey];
+  const dashboardUrl = "https://hitlook-app.web.app/dashboard";
+
+  const subject = t.subject(nome);
   const text =
-    `Você recebeu um novo lead no HitLook.\n\n` +
-    `Nome: ${nome}\n` +
-    `Telefone: ${telefone}\n` +
-    `Score: ${score}\n` +
-    `Idioma: ${lang}\n\n` +
-    `Acesse seu painel: https://hitlook-app.web.app/dashboard`;
+    `${t.intro}\n\n` +
+    `${t.fields.nome}: ${nome}\n` +
+    `${t.fields.telefone}: ${telefone}\n` +
+    `${t.fields.score}: ${score}\n` +
+    `${t.fields.idioma}: ${lang}\n\n` +
+    `${t.cta} ${dashboardUrl}\n\n` +
+    `— ${t.disclaimer}`;
 
   const html =
-    `<h2>Novo lead HitLook</h2>` +
-    `<p><strong>Nome:</strong> ${escapeHtml(nome)}</p>` +
-    `<p><strong>Telefone:</strong> ${escapeHtml(telefone)}</p>` +
-    `<p><strong>Score:</strong> ${escapeHtml(String(score))}</p>` +
-    `<p><strong>Idioma:</strong> ${escapeHtml(lang)}</p>` +
-    `<p><a href="https://hitlook-app.web.app/dashboard">Abrir painel</a></p>`;
+    `<h2>${escapeHtml(t.heading)}</h2>` +
+    `<p><strong>${escapeHtml(t.fields.nome)}:</strong> ${escapeHtml(nome)}</p>` +
+    `<p><strong>${escapeHtml(t.fields.telefone)}:</strong> ${escapeHtml(telefone)}</p>` +
+    `<p><strong>${escapeHtml(t.fields.score)}:</strong> ${escapeHtml(String(score))}</p>` +
+    `<p><strong>${escapeHtml(t.fields.idioma)}:</strong> ${escapeHtml(lang)}</p>` +
+    `<p><a href="${dashboardUrl}">${escapeHtml(t.ctaLink)}</a></p>` +
+    `<hr><p style="font-size:12px;color:#666">${escapeHtml(t.disclaimer)}</p>`;
 
   await db.collection("mail").add({
     to: email,

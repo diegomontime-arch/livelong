@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<title>Privacy Policy — HitLook</title>
+<link rel="alternate" hreflang="en" href="/privacy.html">
+<link rel="alternate" hreflang="pt" href="/privacy.pt.html">
+<link rel="alternate" hreflang="es" href="/privacy.es.html">
+<link rel="alternate" hreflang="x-default" href="/privacy.html">
+<style>
+  :root {
+    --bg: #000;
+    --card: #0d0d0d;
+    --gold: #d4af37;
+    --gold-dim: #8b7420;
+    --text: #f5f0eb;
+    --muted: #888;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 0;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+  header { border-bottom: 1px solid var(--gold-dim); padding-bottom: 16px; margin-bottom: 32px; }
+  h1 { font-size: 28px; font-weight: 900; letter-spacing: 0.5px; margin: 0 0 4px; color: var(--gold); }
+  h2 { font-size: 18px; font-weight: 700; margin: 32px 0 8px; color: var(--gold); }
+  h3 { font-size: 15px; font-weight: 600; margin: 20px 0 4px; color: var(--text); }
+  .lang-switch { font-size: 13px; color: var(--muted); }
+  .lang-switch a { color: var(--gold); text-decoration: none; margin: 0 6px; }
+  .effective { color: var(--muted); font-size: 13px; }
+  .placeholder { background: #1a1a1a; border-left: 3px solid var(--gold); padding: 10px 14px; margin: 8px 0; color: var(--muted); font-style: italic; font-size: 13px; }
+  ul { padding-left: 22px; }
+  ul li { margin-bottom: 6px; }
+  a { color: var(--gold); }
+  .disclaimer-note { background: rgba(212,175,55,0.08); border: 1px solid var(--gold-dim); padding: 14px 16px; border-radius: 6px; margin: 24px 0; font-size: 14px; }
+  footer { border-top: 1px solid var(--gold-dim); margin-top: 48px; padding-top: 16px; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Privacy Policy</h1>
+    <p class="effective">Effective date: <strong>[LEGAL_TEXT — set after attorney review]</strong> · Version 1.0</p>
+    <p class="lang-switch">
+      <strong>English</strong> · <a href="/privacy.pt.html">Português</a> · <a href="/privacy.es.html">Español</a>
+    </p>
+  </header>
+
+  <div class="disclaimer-note">
+    <strong>HitLook is an educational tool. It does not provide insurance advice.</strong>
+    All licensed activities are performed by independent agents authorized in
+    the relevant state. See §7 below.
+  </div>
+
+  <p>[LEGAL_TEXT — short intro paragraph: who we are, scope of this policy, that by using the Service you accept it. Insurance B2B context.]</p>
+
+  <h2>1. Definitions</h2>
+  <ul>
+    <li><strong>"Agent"</strong> — an insurance professional licensed under applicable state law who uses HitLook as a software tool.</li>
+    <li><strong>"Prospect"</strong> — an individual who completes the public questionnaire on an Agent's personal link (<code>/a/{slug}</code>).</li>
+    <li><strong>"Tenant"</strong> — an insurance agency (e.g., M4LIFE USA) that contracts HitLook to provide Agents with the platform.</li>
+    <li><strong>"Personal Information"</strong> — as defined by Cal. Civ. Code §1798.140(o) (CCPA/CPRA).</li>
+    <li><strong>"Educational Content"</strong> — general financial-education material that is not insurance advice.</li>
+  </ul>
+
+  <h2>2. Who we are</h2>
+  <p>[LEGAL_TEXT — Entity name (e.g., HitLook LLC), state of incorporation (FL or DE), business address, and the privacy contact: <a href="mailto:privacy@hitlook.us">privacy@hitlook.us</a>. Fill after LLC formation — planning/LEGAL.md §10.]</p>
+
+  <h2>3. Information we collect</h2>
+
+  <h3>3.1 From Agents</h3>
+  <ul>
+    <li>Email (used as login).</li>
+    <li>Display name, profile photo, WhatsApp number, bio.</li>
+    <li>Public URL slug.</li>
+    <li>State insurance license number (where collected).</li>
+  </ul>
+
+  <h3>3.2 From Prospects</h3>
+  <ul>
+    <li>Name and phone number.</li>
+    <li>Date of birth (used to estimate eligibility and decline minors).</li>
+    <li>Questionnaire answers: dependents, household income range, existing insurance status.</li>
+    <li>Conversations with the educational assistant "Ana" (transient, not persisted in our database; processed by Anthropic, see §6).</li>
+  </ul>
+
+  <h3>3.3 Collected automatically</h3>
+  <ul>
+    <li>Device type and browser, language preference, locale.</li>
+    <li>Crash diagnostics (Firebase Crashlytics).</li>
+    <li>Usage events (Firebase Analytics) — opt-out via §8.</li>
+  </ul>
+
+  <h2>4. How we use it</h2>
+  <ul>
+    <li>To qualify leads and route them to the Agent.</li>
+    <li>To enable communication between the Agent and the Prospect (WhatsApp deep link).</li>
+    <li>To improve the Service and detect abuse.</li>
+    <li>To comply with legal obligations, including state insurance regulations.</li>
+  </ul>
+
+  <h2>5. Educational AI — "Ana"</h2>
+  <p>The conversational assistant inside the Service ("Ana") provides
+  general financial-education content. <strong>Ana does NOT recommend
+  insurance products, give pricing, or make personalized suitability
+  determinations.</strong> All recommendations come from a human Agent
+  licensed in the Prospect's state. Conversations with Ana are processed
+  by Anthropic, PBC (see §6).</p>
+
+  <h2>6. Sharing of information</h2>
+  <p>[LEGAL_TEXT — confirm with counsel that "Service Providers" under CCPA cover the list below; we do NOT sell or share for cross-context behavioral advertising.]</p>
+  <ul>
+    <li><strong>The Agent</strong> who owns the Prospect's link receives the Prospect's data.</li>
+    <li><strong>The Tenant</strong> (Agent's agency administrator) sees its Agents' leads.</li>
+    <li><strong>Service Providers (sub-processors):</strong>
+      Google LLC (Firebase Auth, Firestore, Storage, Hosting, Functions — US),
+      Anthropic, PBC (Educational AI — US),
+      Cloudflare, Inc. (DNS, edge proxy — global),
+      Apple Inc. (App Store, Sign in with Apple, push — US),
+      [LEGAL_TEXT — add Stripe, Inc. when billing is activated].
+    </li>
+    <li><strong>We do not sell or share Personal Information</strong> for cross-context behavioral advertising as defined by CPRA §1798.140(ah)(1).</li>
+  </ul>
+
+  <h2>7. Insurance regulatory disclosure</h2>
+  <p>HitLook is not a licensed insurance producer, broker, or solicitor.
+  All licensed insurance activities are performed by independent Agents
+  authorized in the relevant state. HitLook acts as a software vendor to
+  those Agents under §626.9651 Fla. Stat. and NAIC Model 870. Compliance
+  with state insurance privacy and conduct rules remains the
+  responsibility of each licensed Agent.</p>
+
+  <h2>8. Your rights</h2>
+
+  <h3>8.1 California residents (CCPA / CPRA)</h3>
+  <ul>
+    <li><strong>Right to Know</strong> — what Personal Information we collect.</li>
+    <li><strong>Right to Delete</strong> — request deletion of Personal Information.</li>
+    <li><strong>Right to Correct</strong> — request correction of inaccurate data.</li>
+    <li><strong>Right to Opt-out</strong> of sale/sharing — we do not sell or share.</li>
+    <li><strong>Right to Limit Use</strong> of sensitive Personal Information.</li>
+    <li><strong>Right to Non-discrimination.</strong></li>
+  </ul>
+  <p>To exercise a right, email <a href="mailto:privacy@hitlook.us">privacy@hitlook.us</a>. We respond within 45 days as required by Cal. Civ. Code §1798.130(a)(2).</p>
+
+  <h3>8.2 Other state residents</h3>
+  <p>[LEGAL_TEXT — when applicable: TDPSA (Texas), VCDPA (Virginia), CPA (Colorado), CTDPA (Connecticut). Likely not in scope for v1.]</p>
+
+  <h3>8.3 International users</h3>
+  <p>The Service is intended for residents of the United States. If you access it from outside the US, you acknowledge that your information is processed in the United States.</p>
+
+  <h2>9. Data retention</h2>
+  <ul>
+    <li><strong>Agent account data:</strong> while the subscription is active, then 6 years for tax and audit compliance.</li>
+    <li><strong>Prospect leads not converted:</strong> 24 months.</li>
+    <li><strong>Prospect leads converted to a policy:</strong> retained by the licensed Agent per state insurance regulation (typically 5-7 years after policy termination).</li>
+    <li><strong>Conversations with Ana:</strong> not persisted by HitLook; Anthropic retains transient logs subject to its own policy.</li>
+    <li><strong>System logs:</strong> 30 days.</li>
+    <li><strong>Privacy audit logs (hashed):</strong> 3 years.</li>
+  </ul>
+
+  <h2>10. Security measures</h2>
+  <ul>
+    <li>TLS 1.2+ for all network traffic.</li>
+    <li>Firebase Security Rules enforced server-side.</li>
+    <li>App Check (when enabled) verifies that callers are legitimate app instances.</li>
+    <li>Secrets stored in Google Secret Manager and Cloudflare Workers secrets.</li>
+    <li>Limited employee access on a need-to-know basis.</li>
+  </ul>
+
+  <h2>11. Breach notification</h2>
+  <p>If we discover a security breach involving Personal Information of a
+  Florida resident, we will notify affected individuals and the Florida
+  Office of the Attorney General within thirty (30) days as required by
+  the Florida Information Protection Act (Fla. Stat. §501.171). For
+  California residents, we will notify in the most expedient time
+  possible and without unreasonable delay.</p>
+
+  <h2>12. International users</h2>
+  <p>See §8.3.</p>
+
+  <h2>13. Minors</h2>
+  <p>The Service is intended for adults. We do not knowingly collect
+  Personal Information from individuals under 18. If you become aware
+  that a minor provided information, contact
+  <a href="mailto:privacy@hitlook.us">privacy@hitlook.us</a> for deletion.</p>
+
+  <h2>14. Cookies and tracking</h2>
+  <p>The Service uses Firebase Analytics (usage events), Firebase
+  Crashlytics (diagnostic crashes), and Firebase App Check. We do not
+  use third-party advertising cookies. [LEGAL_TEXT — if a consent banner
+  is added in v1.1, describe it here.]</p>
+
+  <h2>15. Changes to this policy</h2>
+  <p>We may update this policy. The "Effective date" at the top reflects
+  the latest version. Material changes will be announced via in-app
+  banner and, for Agents, by email to the address on file at least 15
+  days before they take effect.</p>
+
+  <h2>16. Contact</h2>
+  <p>Privacy questions: <a href="mailto:privacy@hitlook.us">privacy@hitlook.us</a><br>
+  Data Protection Officer: <a href="mailto:dpo@hitlook.us">dpo@hitlook.us</a><br>
+  Postal address: [LEGAL_TEXT — add LLC mailing address after formation].</p>
+
+  <footer>
+    <p>[LEGAL_TEXT — final attorney sign-off line + entity name + jurisdictional notice]</p>
+    <p>See also our <a href="/terms.html">Terms of Use</a>.</p>
+  </footer>
+</div>
+</body>
+</html>

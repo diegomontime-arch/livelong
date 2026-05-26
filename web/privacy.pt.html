@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+<title>Política de Privacidade — HitLook</title>
+<link rel="alternate" hreflang="en" href="/privacy.html">
+<link rel="alternate" hreflang="pt" href="/privacy.pt.html">
+<link rel="alternate" hreflang="es" href="/privacy.es.html">
+<link rel="alternate" hreflang="x-default" href="/privacy.html">
+<style>
+  :root { --bg:#000; --card:#0d0d0d; --gold:#d4af37; --gold-dim:#8b7420; --text:#f5f0eb; --muted:#888; }
+  *{box-sizing:border-box;} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+  .wrap{max-width:760px;margin:0 auto;padding:32px 20px 64px;}
+  header{border-bottom:1px solid var(--gold-dim);padding-bottom:16px;margin-bottom:32px;}
+  h1{font-size:28px;font-weight:900;margin:0 0 4px;color:var(--gold);}
+  h2{font-size:18px;font-weight:700;margin:32px 0 8px;color:var(--gold);}
+  h3{font-size:15px;font-weight:600;margin:20px 0 4px;}
+  .lang-switch{font-size:13px;color:var(--muted);} .lang-switch a{color:var(--gold);text-decoration:none;margin:0 6px;}
+  .effective{color:var(--muted);font-size:13px;}
+  .placeholder{background:#1a1a1a;border-left:3px solid var(--gold);padding:10px 14px;margin:8px 0;color:var(--muted);font-style:italic;font-size:13px;}
+  ul{padding-left:22px;} ul li{margin-bottom:6px;} a{color:var(--gold);}
+  .disclaimer-note{background:rgba(212,175,55,0.08);border:1px solid var(--gold-dim);padding:14px 16px;border-radius:6px;margin:24px 0;font-size:14px;}
+  footer{border-top:1px solid var(--gold-dim);margin-top:48px;padding-top:16px;font-size:12px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Política de Privacidade</h1>
+    <p class="effective">Data de vigência: <strong>[LEGAL_TEXT — definir após revisão jurídica]</strong> · Versão 1.0</p>
+    <p class="lang-switch">
+      <a href="/privacy.html">English</a> · <strong>Português</strong> · <a href="/privacy.es.html">Español</a>
+    </p>
+  </header>
+
+  <div class="disclaimer-note">
+    <strong>HitLook é uma ferramenta educacional. Não fornece aconselhamento de seguros.</strong>
+    Todas as atividades licenciadas são realizadas por agentes independentes
+    autorizados no estado correspondente. Ver §7 abaixo.
+  </div>
+
+  <p>[LEGAL_TEXT — parágrafo introdutório: quem somos, escopo desta política, e que ao usar o Serviço você a aceita. Contexto B2B seguros.]</p>
+
+  <h2>1. Definições</h2>
+  <ul>
+    <li><strong>"Agente"</strong> — profissional de seguros licenciado pela legislação estadual aplicável que usa o HitLook como ferramenta de software.</li>
+    <li><strong>"Prospect"</strong> — indivíduo que completa o questionário público no link pessoal do Agente (<code>/a/{slug}</code>).</li>
+    <li><strong>"Tenant"</strong> — agência de seguros (ex: M4LIFE USA) que contrata o HitLook para fornecer a plataforma aos Agentes.</li>
+    <li><strong>"Informação Pessoal"</strong> — conforme definido pela Cal. Civ. Code §1798.140(o) (CCPA/CPRA).</li>
+    <li><strong>"Conteúdo Educacional"</strong> — material geral de educação financeira que não constitui aconselhamento de seguros.</li>
+  </ul>
+
+  <h2>2. Quem somos</h2>
+  <p>[LEGAL_TEXT — Razão social (ex: HitLook LLC), estado de incorporação (FL ou DE), endereço comercial e contato de privacidade: <a href="mailto:privacy@hitlook.us">privacy@hitlook.us</a>. Preencher após formação da LLC — planning/LEGAL.md §10.]</p>
+
+  <h2>3. Informações que coletamos</h2>
+  <h3>3.1 De Agentes</h3>
+  <ul>
+    <li>Email (usado como login).</li>
+    <li>Nome de exibição, foto, número do WhatsApp, bio.</li>
+    <li>URL pública (slug).</li>
+    <li>Número da licença estadual de seguros (quando coletado).</li>
+  </ul>
+  <h3>3.2 De Prospects</h3>
+  <ul>
+    <li>Nome e telefone.</li>
+    <li>Data de nascimento (para verificar elegibilidade e bloquear menores).</li>
+    <li>Respostas do questionário: dependentes, faixa de renda familiar, status do seguro atual.</li>
+    <li>Conversas com a assistente educacional "Ana" (transientes, não persistidas em nosso banco; processadas pela Anthropic, ver §6).</li>
+  </ul>
+  <h3>3.3 Coletadas automaticamente</h3>
+  <ul>
+    <li>Tipo de dispositivo e navegador, idioma e locale.</li>
+    <li>Diagnóstico de crashes (Firebase Crashlytics).</li>
+    <li>Eventos de uso (Firebase Analytics) — opt-out via §8.</li>
+  </ul>
+
+  <h2>4. Como usamos</h2>
+  <ul>
+    <li>Qualificar leads e encaminhá-los ao Agente.</li>
+    <li>Habilitar comunicação Agente↔Prospect (deep link WhatsApp).</li>
+    <li>Melhorar o Serviço e detectar abusos.</li>
+    <li>Cumprir obrigações legais, incluindo regulamentações estaduais de seguros.</li>
+  </ul>
+
+  <h2>5. IA Educacional — "Ana"</h2>
+  <p>A assistente conversacional do Serviço ("Ana") fornece conteúdo
+  geral de educação financeira. <strong>A Ana NÃO recomenda produtos
+  de seguro, não dá preços e não faz avaliações de adequação
+  personalizadas.</strong> Todas as recomendações vêm do Agente humano
+  licenciado no estado do Prospect. As conversas com a Ana são
+  processadas pela Anthropic, PBC (ver §6).</p>
+
+  <h2>6. Compartilhamento de informações</h2>
+  <p>[LEGAL_TEXT — confirmar com advogado que os "Service Providers" abaixo se enquadram em CCPA; NÃO vendemos nem compartilhamos para publicidade comportamental.]</p>
+  <ul>
+    <li><strong>O Agente</strong> dono do link do Prospect recebe os dados.</li>
+    <li><strong>O Tenant</strong> (administrador da agência) vê os leads dos seus Agentes.</li>
+    <li><strong>Provedores de Serviço (sub-processadores):</strong>
+      Google LLC (Firebase — EUA),
+      Anthropic, PBC (IA Educacional — EUA),
+      Cloudflare, Inc. (DNS, edge proxy — global),
+      Apple Inc. (App Store, Sign in with Apple, push — EUA),
+      [LEGAL_TEXT — adicionar Stripe quando billing for ativado].
+    </li>
+    <li><strong>Não vendemos nem compartilhamos Informações Pessoais</strong> para publicidade comportamental conforme CPRA §1798.140(ah)(1).</li>
+  </ul>
+
+  <h2>7. Aviso regulatório de seguros</h2>
+  <p>O HitLook não é um produtor, corretor ou solicitador de seguros
+  licenciado. Toda atividade licenciada é realizada por Agentes
+  independentes autorizados no estado correspondente. O HitLook atua
+  como fornecedor de software para esses Agentes nos termos de §626.9651
+  Fla. Stat. e do NAIC Model 870. A conformidade com regras estaduais
+  de privacidade e conduta de seguros permanece sob responsabilidade
+  do Agente licenciado.</p>
+
+  <h2>8. Seus direitos</h2>
+  <h3>8.1 Residentes na Califórnia (CCPA / CPRA)</h3>
+  <ul>
+    <li>Direito de saber, de excluir, de corrigir.</li>
+    <li>Opt-out de venda/compartilhamento — não vendemos nem compartilhamos.</li>
+    <li>Limitação do uso de informações pessoais sensíveis.</li>
+    <li>Não-discriminação.</li>
+  </ul>
+  <p>Para exercer, envie email para <a href="mailto:privacy@hitlook.us">privacy@hitlook.us</a>. Respondemos em até 45 dias, conforme Cal. Civ. Code §1798.130(a)(2).</p>
+  <h3>8.2 Residentes em outros estados</h3>
+  <p>[LEGAL_TEXT — quando aplicável: TDPSA (TX), VCDPA (VA), CPA (CO), CTDPA (CT). Provavelmente fora do escopo v1.]</p>
+  <h3>8.3 Usuários internacionais</h3>
+  <p>O Serviço é destinado a residentes nos Estados Unidos. Se você acessá-lo de fora dos EUA, reconhece que seus dados são processados nos EUA.</p>
+
+  <h2>9. Retenção de dados</h2>
+  <ul>
+    <li><strong>Conta do Agente:</strong> enquanto a assinatura estiver ativa, depois 6 anos para fins fiscais e auditoria.</li>
+    <li><strong>Leads de Prospects não convertidos:</strong> 24 meses.</li>
+    <li><strong>Leads convertidos em apólice:</strong> retidos pelo Agente licenciado conforme regulação estadual (tipicamente 5-7 anos após término da apólice).</li>
+    <li><strong>Conversas com a Ana:</strong> não persistidas pelo HitLook; a Anthropic mantém logs transientes conforme sua própria política.</li>
+    <li><strong>Logs de sistema:</strong> 30 dias.</li>
+    <li><strong>Audit logs de privacidade (com hash):</strong> 3 anos.</li>
+  </ul>
+
+  <h2>10. Medidas de segurança</h2>
+  <ul>
+    <li>TLS 1.2+ em todo tráfego.</li>
+    <li>Regras de segurança do Firebase aplicadas no servidor.</li>
+    <li>App Check (quando ativo) verifica que os chamadores são instâncias legítimas do app.</li>
+    <li>Segredos no Google Secret Manager e Cloudflare Workers secrets.</li>
+    <li>Acesso de funcionários limitado por necessidade.</li>
+  </ul>
+
+  <h2>11. Notificação de incidentes</h2>
+  <p>Em caso de incidente de segurança envolvendo Informações Pessoais
+  de um residente da Flórida, notificaremos os indivíduos afetados e o
+  Florida Office of the Attorney General em até 30 dias, conforme o
+  Florida Information Protection Act (Fla. Stat. §501.171). Para
+  residentes da Califórnia, notificaremos no menor tempo possível e
+  sem atraso injustificado.</p>
+
+  <h2>12. Usuários internacionais</h2>
+  <p>Ver §8.3.</p>
+
+  <h2>13. Menores</h2>
+  <p>O Serviço destina-se a adultos. Não coletamos intencionalmente
+  Informações Pessoais de menores de 18 anos. Se souber que um menor
+  forneceu dados, contate <a href="mailto:privacy@hitlook.us">privacy@hitlook.us</a> para exclusão.</p>
+
+  <h2>14. Cookies e rastreamento</h2>
+  <p>O Serviço usa Firebase Analytics (eventos de uso), Firebase
+  Crashlytics (diagnóstico de crashes) e Firebase App Check. Não usamos
+  cookies de publicidade de terceiros. [LEGAL_TEXT — se um banner de
+  consentimento for adicionado em v1.1, descrever aqui.]</p>
+
+  <h2>15. Alterações nesta política</h2>
+  <p>Podemos atualizar esta política. A "Data de vigência" no topo
+  reflete a versão atual. Mudanças relevantes serão anunciadas via
+  banner in-app e, para Agentes, por email no endereço cadastrado com
+  pelo menos 15 dias de antecedência.</p>
+
+  <h2>16. Contato</h2>
+  <p>Privacidade: <a href="mailto:privacidade@hitlook.us">privacidade@hitlook.us</a><br>
+  Encarregado de Proteção de Dados: <a href="mailto:dpo@hitlook.us">dpo@hitlook.us</a><br>
+  Endereço postal: [LEGAL_TEXT — preencher após formação da LLC].</p>
+
+  <footer>
+    <p>[LEGAL_TEXT — linha final de aprovação jurídica + razão social + nota jurisdicional]</p>
+    <p>Ver também nossos <a href="/terms.pt.html">Termos de Uso</a>.</p>
+  </footer>
+</div>
+</body>
+</html>

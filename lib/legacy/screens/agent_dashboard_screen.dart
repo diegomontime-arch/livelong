@@ -157,11 +157,45 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         .toList();
   }
 
+  /// Compare phone/name ignoring case, diacritics and non-digits — D3.
+  /// Previously "José" / "Jose" and "+1 305" / "1305" were treated as
+  /// different leads, leaving duplicate rows in the dashboard.
+  String _normalizeName(String s) {
+    final lowered = s.trim().toLowerCase();
+    const accents = 'áàâãäåéèêëíìîïóòôõöúùûüçñ';
+    const plain = 'aaaaaaeeeeiiiiooooouuuucn';
+    final sb = StringBuffer();
+    for (final ch in lowered.split('')) {
+      final i = accents.indexOf(ch);
+      sb.write(i == -1 ? ch : plain[i]);
+    }
+    return sb.toString().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String _normalizePhone(String s) =>
+      s.replaceAll(RegExp(r'\D'), '');
+
+  /// Returns a stable fingerprint `phone|name` for dedup, or null when
+  /// there is no phone (we won't try to dedup by name alone).
+  String? _leadFingerprint(Map<String, dynamic> lead) {
+    final phone = _normalizePhone(leadDisplayPhone(lead));
+    if (phone.isEmpty) return null;
+    final name = _normalizeName(leadDisplayName(lead));
+    return '$phone|$name';
+  }
+
   List<Map<String, dynamic>> _mergeLeadRows(
     List<Map<String, dynamic>> rootLeads,
     List<Map<String, dynamic>> companyLeads,
   ) {
     final byKey = <String, Map<String, dynamic>>{};
+    // Build a fingerprint set of root leads once — O(n) — instead of an
+    // O(n²) scan per company lead.
+    final rootFingerprints = <String>{};
+    for (final r in rootLeads) {
+      final fp = _leadFingerprint(r);
+      if (fp != null) rootFingerprints.add(fp);
+    }
     for (final lead in rootLeads) {
       final id = lead['id']?.toString();
       if (id == null || id.isEmpty) continue;
@@ -170,14 +204,8 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     for (final lead in companyLeads) {
       final id = lead['id']?.toString();
       if (id == null || id.isEmpty) continue;
-      final phone = leadDisplayPhone(lead);
-      final name = leadDisplayName(lead);
-      final duplicate = rootLeads.any(
-        (r) =>
-            leadDisplayPhone(r) == phone &&
-            phone.isNotEmpty &&
-            leadDisplayName(r) == name,
-      );
+      final fp = _leadFingerprint(lead);
+      final duplicate = fp != null && rootFingerprints.contains(fp);
       if (!duplicate) {
         byKey['company:$id'] = lead;
       }
@@ -249,6 +277,38 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         _dashboardLog('[Dashboard] companyLeads count=${companyLeads.length}');
       } catch (e) {
         _dashboardLog('[Dashboard] company leads: $e');
+      }
+
+      // Run the three independent reads in parallel — D2 in planning/CHECKLIST.md.
+      // resolvePublicLinkId(uid), _fetchRootLeads(uid) and _fetchCompanyLeads(agent)
+      // were previously sequential, adding ~1 round-trip each on slow networks.
+      final results = await Future.wait<dynamic>([
+        AgentProvider.resolvePublicLinkId(uid),
+        runWithTimeout(() => _fetchRootLeads(uid)),
+        _fetchCompanyLeads(agent).catchError((e) {
+          debugPrint('[Dashboard] company leads: $e');
+          return const <Map<String, dynamic>>[];
+        }),
+      ]);
+
+      final String? publicId = results[0] as String?;
+      final List<Map<String, dynamic>>? rootLeads =
+          results[1] as List<Map<String, dynamic>>?;
+      final List<Map<String, dynamic>> companyLeads =
+          (results[2] as List<Map<String, dynamic>>?) ??
+              const <Map<String, dynamic>>[];
+
+      if (mounted) setState(() => _publicLinkId = publicId);
+
+      if (rootLeads == null) {
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _loadError =
+                'Demorou demais para carregar. Verifique sua conexão e tente novamente.';
+          });
+        }
+        return;
       }
 
       final merged = _mergeLeadRows(rootLeads, companyLeads);

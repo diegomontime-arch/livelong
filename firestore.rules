@@ -151,11 +151,16 @@ service cloud.firestore {
         && sellerData(data.companyId, data.sellerId).userId == request.auth.uid;
     }
 
-    function slugWriteValid() {
+    // Slug write validation (planning/SECURITY.md S4).
+    // Receives `slug` from the parent match path; the slug field inside
+    // the document must equal that path segment to prevent index pollution
+    // (a seller could otherwise create seller_slugs/diego with slug='renan').
+    function slugWriteValid(slug) {
       let data = request.resource.data;
       return data.companyId is string
         && data.sellerId is string
         && data.slug is string
+        && data.slug == slug
         && sellerExists(data.companyId, data.sellerId)
         && (
           isCompanyAdmin(data.companyId)
@@ -222,7 +227,9 @@ service cloud.firestore {
     match /companies/{companyId} {
       allow read: if isCompanyMember(companyId) || isHitLookMaster();
 
-      allow create: if isSignedIn()
+      // Only HitLook master (Diego) creates companies — planning/SECURITY.md S5.
+      // Self-service onboarding is intentionally out of v1 scope.
+      allow create: if isHitLookMaster()
         && request.resource.data.keys().hasOnly([
           'tenantId',
           'name',
@@ -314,7 +321,7 @@ service cloud.firestore {
       allow get: if true;
       allow list: if false;
 
-      allow create, update: if slugWriteValid();
+      allow create, update: if slugWriteValid(slug);
 
       allow delete: if isSignedIn()
         && resource.data.companyId is string

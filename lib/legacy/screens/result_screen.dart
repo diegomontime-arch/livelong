@@ -859,6 +859,24 @@ class _ResultScreenState extends State<ResultScreen>
 
                   const SizedBox(height: 10),
 
+                  // ── DISCLAIMER REGULATÓRIO ─────────
+                  // Visível imediatamente antes do CTA do consultor.
+                  // Obrigatório por planning/LEGAL.md §6 e planning/RISKS.md R1.
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      _t('edu_disc'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        height: 1.35,
+                        color: AppColors.grey.withOpacity(0.85),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
                   // ── BOTÃO FALAR COM CONSULTOR ──
                   SizedBox(
                     width: double.infinity,
