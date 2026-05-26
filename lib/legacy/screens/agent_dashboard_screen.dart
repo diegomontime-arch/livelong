@@ -48,24 +48,9 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     }
   }
 
-  Future<List<Map<String, dynamic>>> _fetchRootLeads(String uid) async {
-    QuerySnapshot<Map<String, dynamic>> snapshot;
-    try {
-      snapshot = await FirebaseFirestore.instance
-          .collection('leads')
-          .where('agentId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .limit(_pageSize)
-          .get();
-    } on FirebaseException catch (e) {
-      if (e.code != 'failed-precondition') rethrow;
-      snapshot = await FirebaseFirestore.instance
-          .collection('leads')
-          .where('agentId', isEqualTo: uid)
-          .limit(_pageSize)
-          .get();
-    }
-
+  List<Map<String, dynamic>> _snapshotToLeadRows(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+  ) {
     final rows = snapshot.docs
         .map((doc) => {'id': doc.id, ...doc.data()})
         .toList();
@@ -78,6 +63,53 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
       return db.compareTo(da);
     });
     return rows;
+  }
+
+  Future<QuerySnapshot<Map<String, dynamic>>> _queryRootLeadsUnordered(
+    String uid,
+  ) async {
+    debugPrint('[Dashboard] leads query (unordered): agentId == $uid');
+    return FirebaseFirestore.instance
+        .collection('leads')
+        .where('agentId', isEqualTo: uid)
+        .limit(_pageSize)
+        .get();
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchRootLeads(String uid) async {
+    debugPrint('[Dashboard] uid=$uid');
+    debugPrint('[Dashboard] leads query: agentId == uid');
+
+    QuerySnapshot<Map<String, dynamic>> snapshot;
+    try {
+      snapshot = await FirebaseFirestore.instance
+          .collection('leads')
+          .where('agentId', isEqualTo: uid)
+          .orderBy('createdAt', descending: true)
+          .limit(_pageSize)
+          .get();
+      debugPrint(
+        '[Dashboard] root leads (ordered): ${snapshot.docs.length} docs',
+      );
+      // orderBy omits documents without createdAt — retry if empty but data may exist.
+      if (snapshot.docs.isEmpty) {
+        snapshot = await _queryRootLeadsUnordered(uid);
+        debugPrint(
+          '[Dashboard] root leads (unordered retry): ${snapshot.docs.length} docs',
+        );
+      }
+    } on FirebaseException catch (e) {
+      debugPrint(
+        '[Dashboard] root leads ordered error: code=${e.code} message=${e.message}',
+      );
+      if (e.code != 'failed-precondition') rethrow;
+      snapshot = await _queryRootLeadsUnordered(uid);
+      debugPrint(
+        '[Dashboard] root leads (index fallback): ${snapshot.docs.length} docs',
+      );
+    }
+
+    return _snapshotToLeadRows(snapshot);
   }
 
   Future<List<Map<String, dynamic>>> _fetchCompanyLeads(AgentProfile agent) async {
@@ -156,8 +188,13 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   }
 
   Future<void> _loadData({bool refresh = false}) async {
+    debugPrint(
+      '[Dashboard] uid=${FirebaseAuth.instance.currentUser?.uid}',
+    );
+
     final uid = await _resolveUid();
     if (uid == null) {
+      debugPrint('[Dashboard] uid resolve failed — not signed in');
       if (mounted) {
         setState(() {
           _loading = false;
@@ -166,6 +203,8 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
       }
       return;
     }
+
+    debugPrint('[Dashboard] resolved uid=$uid');
 
     if (refresh) {
       setState(() {
@@ -176,46 +215,56 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     }
 
     try {
-      final agentDoc = await runWithTimeout(
-        () => FirebaseFirestore.instance.collection('agents').doc(uid).get(),
-      );
+      // Leads first — do not block on profile / public link resolution.
+      final rootLeads = await _fetchRootLeads(uid);
+      debugPrint('[Dashboard] rootLeads count=${rootLeads.length}');
 
       var agent = _agent;
-      if (agentDoc != null && agentDoc.exists && agentDoc.data() != null) {
-        agent = AgentProfile.fromMap(uid, agentDoc.data()!);
-        if (mounted) setState(() => _agent = agent);
+      try {
+        agent = await AgentProvider.loadAgent(uid);
+        debugPrint(
+          '[Dashboard] agent loaded nome="${agent.nome}" saas=${agent.hasSaaSContext}',
+        );
+      } catch (e) {
+        debugPrint('[Dashboard] AgentProvider.loadAgent: $e');
       }
 
-      final publicId = await AgentProvider.resolvePublicLinkId(uid);
-      if (mounted) setState(() => _publicLinkId = publicId);
-
-      final rootLeads = await runWithTimeout(() => _fetchRootLeads(uid));
-      if (rootLeads == null) {
-        if (mounted) {
-          setState(() {
-            _loading = false;
-            _loadError =
-                'Demorou demais para carregar. Verifique sua conexão e tente novamente.';
-          });
-        }
-        return;
+      String publicId = _publicLinkId;
+      try {
+        publicId = await AgentProvider.resolvePublicLinkId(uid);
+      } catch (e) {
+        debugPrint('[Dashboard] resolvePublicLinkId: $e');
       }
 
       List<Map<String, dynamic>> companyLeads = const [];
       try {
         companyLeads = await _fetchCompanyLeads(agent);
+        debugPrint('[Dashboard] companyLeads count=${companyLeads.length}');
       } catch (e) {
         debugPrint('[Dashboard] company leads: $e');
       }
 
       final merged = _mergeLeadRows(rootLeads, companyLeads);
+      debugPrint('[Dashboard] merged leads count=${merged.length}');
 
       if (mounted) {
         setState(() {
+          _agent = agent;
+          _publicLinkId = publicId;
           _leads = merged;
           _hasMore = merged.length >= _pageSize;
           _loading = false;
           _loadError = null;
+        });
+      }
+    } on FirebaseException catch (e, st) {
+      debugPrint('[Dashboard] FirebaseException: ${e.code} ${e.message}\n$st');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadError = e.code == 'permission-denied'
+              ? 'Sem permissão para ler seus leads. Verifique o login.'
+              : 'Erro ao carregar leads (${e.code}). Tente novamente.';
         });
       }
     } catch (e, st) {
@@ -276,24 +325,46 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     setState(() => _loadingMore = true);
     try {
       final lastCreatedAt = _leads.last['createdAt'];
-      final snapshot = await FirebaseFirestore.instance
-          .collection('leads')
-          .where('agentId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .startAfter([lastCreatedAt])
-          .limit(_pageSize)
-          .get();
+      QuerySnapshot<Map<String, dynamic>> snapshot;
+      if (lastCreatedAt != null) {
+        try {
+          snapshot = await FirebaseFirestore.instance
+              .collection('leads')
+              .where('agentId', isEqualTo: uid)
+              .orderBy('createdAt', descending: true)
+              .startAfter([lastCreatedAt])
+              .limit(_pageSize)
+              .get();
+        } on FirebaseException catch (e) {
+          if (e.code != 'failed-precondition') rethrow;
+          snapshot = await FirebaseFirestore.instance
+              .collection('leads')
+              .where('agentId', isEqualTo: uid)
+              .limit(_pageSize)
+              .get();
+        }
+      } else {
+        snapshot = await FirebaseFirestore.instance
+            .collection('leads')
+            .where('agentId', isEqualTo: uid)
+            .limit(_pageSize)
+            .get();
+      }
 
       if (mounted) {
         setState(() {
-          _leads.addAll(
-            snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}),
-          );
+          final existingIds = _leads.map((l) => l['id']).toSet();
+          for (final doc in snapshot.docs) {
+            if (!existingIds.contains(doc.id)) {
+              _leads.add({'id': doc.id, ...doc.data()});
+            }
+          }
           _hasMore = snapshot.docs.length >= _pageSize;
           _loadingMore = false;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[Dashboard] loadMore: $e');
       if (mounted) setState(() => _loadingMore = false);
     }
   }
@@ -596,8 +667,11 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                     const SizedBox(height: 12),
 
                     Expanded(
-                      child: RefreshIndicator(
+                      child: ColoredBox(
+                        color: AppColors.black,
+                        child: RefreshIndicator(
                         color: AppColors.gold,
+                        backgroundColor: AppColors.blackCard,
                         onRefresh: () => _loadData(refresh: true),
                         child: _leads.isEmpty
                             ? ListView(
@@ -671,6 +745,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                                   );
                                 },
                               ),
+                        ),
                       ),
                     ),
                   ],
