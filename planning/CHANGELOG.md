@@ -8,6 +8,38 @@ Para mudanças anteriores a maio/2026, ver `docs/02-CURRENT_STATUS.md`.
 
 ## [Unreleased]
 
+### Security incident — 2026-05-24
+
+- 🔴 **Anthropic API key exposta no chat** durante tentativa de
+  configurar Secret Manager. Resposta: revogação + rotação +
+  monitoramento de billing 48h. Aprendizado documentado em
+  [TROUBLESHOOTING.md §15](TROUBLESHOOTING.md) e nas instruções de
+  B2 no [CHECKLIST.md](CHECKLIST.md). Regra adicionada: **nunca colar
+  credenciais como argumento posicional da CLI** — usar prompt mascarado
+  ou `--data-file=-`.
+
+### Firebase config audit — 2026-05-24
+
+- 📘 **`planning/FIREBASE_PROJECT.md`** criado — referência operacional
+  com todos os IDs (`hitlook-app` / project number `807145542991`),
+  comandos `firebase` por área (deploy, secrets, logs, hosting,
+  crashlytics), inventário dos arquivos que tocam config, e procedimento
+  para regerar tudo via FlutterFire CLI se A1 mudar o bundle ID.
+- 🔧 **iOS Analytics** ligado de fato: `GoogleService-Info.plist`
+  `IS_ANALYTICS_ENABLED` mudado para `true` (estava `false`,
+  contradizendo a inicialização em `bootstrap.dart` feita em A8).
+- 🔧 **Android Crashlytics plugin** adicionado: `com.google.firebase.crashlytics`
+  em `android/settings.gradle.kts` e aplicado em `android/app/build.gradle.kts`.
+  Sem isso o `firebase_crashlytics` v5 silenciosamente não envia
+  mappings de R8/proguard.
+- 🔒 **`web/env.js` neutralizado**: era `window.ENV = { ANTHROPIC_API_KEY: '' }`
+  — placeholder convidativo para colar uma chave que ficaria pública via
+  Hosting. Trocado por `Object.freeze({})` com comentário explicando
+  o risco e apontando para o Cloudflare Worker / Secret Manager.
+- 🔧 **`.firebaserc`** expandido com alias `prod` (aponta para
+  `hitlook-app`) e `targets.hitlook-app.hosting.app = ['hitlook-app']`
+  para preparar multi-site/multi-env futuro sem refactor.
+
 ### Sprint 1 — Execution (2026-05-23)
 
 12 itens code-safe executados em uma sessão. Working tree em `master` com

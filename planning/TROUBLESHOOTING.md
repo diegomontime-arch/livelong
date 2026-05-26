@@ -306,6 +306,83 @@ gsutil cors get gs://hitlook-app.appspot.com
 
 ---
 
+## 14. `firebase functions:secrets:set` falha com HTTP 403 `serviceusage.services.use`
+
+### Sintoma exato
+
+```
+Error: Request to https://serviceusage.googleapis.com/v1/projects/hitlook-app/services/secretmanager.googleapis.com had HTTP Error: 403, Caller does not have required permission to use project hitlook-app.
+```
+
+### Causa
+
+A conta autenticada no `firebase` CLI não tem permissão para habilitar
+APIs no projeto. O Secret Manager precisa estar habilitado antes do
+primeiro `secrets:set`.
+
+### Fix
+
+1. `firebase login:list` para conferir qual conta está em uso.
+2. Confirmar que essa conta tem **Owner** ou **Editor** em
+   https://console.cloud.google.com/iam-admin/iam?project=hitlook-app.
+3. Se não tiver, adicionar o role
+   `roles/serviceusage.serviceUsageConsumer` ou trocar a conta:
+   ```bash
+   firebase logout
+   firebase login   # autenticar com a conta dona do projeto
+   ```
+4. Refazer: `firebase functions:secrets:set ANTHROPIC_API_KEY` —
+   **usar o prompt mascarado**, não colar a chave como argumento.
+
+### Diagnóstico relacionado
+
+Se o erro for `serviceusage.googleapis.com` com mensagem **diferente**
+(ex: "API not enabled"), abrir
+https://console.cloud.google.com/apis/library/secretmanager.googleapis.com?project=hitlook-app
+e clicar **Enable** manualmente.
+
+---
+
+## 15. Vazamento de API key (Anthropic / Stripe / outras) no chat
+
+### Sintoma
+
+Você colou uma chave em qualquer canal não-seguro (chat com Claude,
+log do shell em screenshot, ticket público, Slack channel aberto).
+
+### Resposta — em ordem
+
+1. **Revogar imediatamente** no console do provedor:
+   - Anthropic: https://console.anthropic.com/settings/keys → Delete
+   - Stripe: https://dashboard.stripe.com/apikeys → Roll/Revoke
+   - SendGrid: API Keys → Delete
+2. **Rotacionar** — gerar nova chave com nome diferente
+   (`{produto}-prod-{YYYY-MM-DD}`).
+3. **Monitorar billing** do provedor por 24-48h. Anthropic alerta em
+   picos. Stripe envia email em qualquer subida abrupta.
+4. **Auditar logs** do produto: requests com origem suspeita nas
+   últimas N horas.
+5. **Atualizar segredos** no Cloudflare Worker / Secret Manager / etc.
+6. Documentar incidente em [LEGAL.md §9](LEGAL.md) — pode acionar
+   notificação por FIPA se PII foi atingida (raro para uma chave de
+   IA, mas avaliar).
+
+### Prevenção
+
+- Nunca colar chave como **argumento** de comando CLI; usar prompt
+  mascarado ou `--data-file=-` com stdin.
+- Comandos como `firebase functions:secrets:set NAME` abrem prompt
+  TTY que esconde o valor; usar essa via.
+- 1Password CLI (`op read`) → pipe direto para o CLI receptor:
+  ```bash
+  op read "op://Personal/Anthropic API/hitlook-prod" \
+    | firebase functions:secrets:set ANTHROPIC_API_KEY --data-file=-
+  ```
+- Em scripts de bootstrap, ler de variável de ambiente exportada por
+  `direnv` ou similar — nunca de literal no histórico.
+
+---
+
 ## Padrão para adicionar novos casos
 
 Quando um problema novo aparecer em produção:

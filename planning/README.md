@@ -4,6 +4,11 @@ Pasta operacional de planejamento e produção. Inspirada no padrão `planning/`
 projeto Whenote (OpenWhen), serve como **fonte da verdade** para o que falta
 para colocar o app pronto para o primeiro release na **Apple App Store**.
 
+> **Escopo v1.0 — Apple-only** (decisão Diego/Yuri, 2026-05-24). Android e Play
+> Store ficam para v1.2+. Itens específicos de Google Play (signing keystore,
+> Play Console, etc.) estão pausados; itens cross-platform (Firebase rules,
+> Cloud Functions, Privacy Policy) continuam valendo.
+
 A pasta `docs/` (existente) continua sendo a documentação **estratégica**
 (visão, modelo de negócio, schema Firestore, etc.). Esta pasta `planning/` é
 **operacional**: checklists, auditorias, riscos, troubleshooting.
@@ -21,6 +26,7 @@ A pasta `docs/` (existente) continua sendo a documentação **estratégica**
 | [FIRESTORE_AUDIT.md](FIRESTORE_AUDIT.md) | Auditoria de queries Firestore — anti-patterns, índices, custos. Lições do refactor de busca de usuários do Whenote. |
 | [SECURITY.md](SECURITY.md) | Análise de `firestore.rules`, `storage.rules`, App Check, secrets, OWASP MASVS. |
 | [FUNCTIONS_AUDIT.md](FUNCTIONS_AUDIT.md) | Auditoria das Cloud Functions (`anthropicProxy`, `createSellerAccount`, `notifyAgentOnNewLead`). |
+| [FIREBASE_PROJECT.md](FIREBASE_PROJECT.md) | Referência operacional do projeto `hitlook-app` — IDs, comandos `firebase`, locais da config, troubleshooting. |
 | [LEGAL.md](LEGAL.md) | Análise jurídica — CCPA/CPRA, Florida DFS, NAIC, estrutura de Privacy Policy + Terms of Use. **Não substitui advogado**, mas mapeia o terreno. |
 | [RISKS.md](RISKS.md) | Mapa de riscos que podem **bloquear o release** (regulatório, segurança, custos). |
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Problemas conhecidos e como diagnosticar — formato Whenote. |

@@ -1,5 +1,14 @@
 {
   "projects": {
-    "default": "hitlook-app"
-  }
+    "default": "hitlook-app",
+    "prod": "hitlook-app"
+  },
+  "targets": {
+    "hitlook-app": {
+      "hosting": {
+        "app": ["hitlook-app"]
+      }
+    }
+  },
+  "etags": {}
 }

@@ -7,6 +7,16 @@
 
 ---
 
+## Escopo v1.0 — Apple-only
+
+Decisão de 2026-05-24: foco no release iOS. Android volta em v1.2+. Itens
+deste checklist que mencionam Android ou Play Store ficam **🚫 fora de
+escopo v1.0** mas permanecem documentados para retomada futura.
+
+Itens cross-platform (Firestore rules, Cloud Functions, Privacy Policy)
+**continuam valendo** porque o web app em `hitlook-app.web.app` ainda
+roda em produção.
+
 ## Como navegar
 
 - 🔴 **Bloqueante** = sem isso, App Store rejeita ou produção quebra.
@@ -144,17 +154,40 @@ nas primeiras 4 semanas.
   - [ ] 48h de observação antes de enforce
 
 ### B2 — Migrar `functions.config()` para Secret Manager
-- **Status:** ✅ Concluído (2026-05-23) — pendente provisioning + deploy
+- **Status:** ✅ Código concluído (2026-05-23); 🔴 **Incidente de chave em 2026-05-24** — pendente rotação + provisioning
 - **Detalhe:** [PRODUCTION.md §F.1](PRODUCTION.md), [SECURITY.md S9](SECURITY.md)
 - **Concluído:**
   - [x] `defineSecret('ANTHROPIC_API_KEY')` no `functions/index.js`
   - [x] Refatorada `anthropicProxy` para Functions v2 `onRequest` + `secrets: [ANTHROPIC_API_KEY]`
   - [x] **Bônus:** Origin allowlist + timeout 30s + logging estruturado (S7, F19)
   - [x] Sintaxe validada com `node --check`
-- **Pendente (manual):**
-  - [ ] `firebase functions:secrets:set ANTHROPIC_API_KEY`
+- **🔴 Incidente 2026-05-24:** chave Anthropic foi exposta no chat ao
+  ser colada como argumento de `firebase functions:secrets:set`. Ação:
+  - [ ] Revogar a chave exposta em https://console.anthropic.com/settings/keys
+  - [ ] Gerar nova chave (nome sugerido `hitlook-prod-YYYY-MM-DD`)
+  - [ ] Monitorar billing 48h
+- **Pendente operacional:**
+  - [ ] Resolver IAM 403: garantir que a conta do `firebase login` tem
+        `roles/serviceusage.serviceUsageConsumer` em `hitlook-app`
+        (ou usar conta Owner)
+  - [ ] **Forma correta** de setar secret (não colar no chat):
+        ```bash
+        firebase functions:secrets:set ANTHROPIC_API_KEY
+        # Digite a chave no prompt mascarado — nunca como argumento na CLI.
+        ```
+        ou via stdin:
+        ```bash
+        read -s ANTHROPIC_KEY
+        echo "$ANTHROPIC_KEY" | firebase functions:secrets:set ANTHROPIC_API_KEY --data-file=-
+        unset ANTHROPIC_KEY
+        ```
   - [ ] `firebase deploy --only functions:anthropicProxy`
-  - [ ] Após deploy, **revogar** o `functions.config()` antigo (`firebase functions:config:unset anthropic`)
+  - [ ] Após deploy, revogar `functions.config()` antigo: `firebase functions:config:unset anthropic`
+
+> **⚠️ Regra geral para todo item de secret no checklist:** nunca colar
+> credenciais no chat ou como argumento posicional da CLI. Use o prompt
+> interativo (TTY mascarado) ou stdin. Documentado para B5, A6 deploy,
+> Stripe (v1.2) e qualquer rotação futura.
 
 ### B3 — Storage rules — hardening
 - **Status:** ✅ Concluído (2026-05-23) — pendente deploy
@@ -415,6 +448,13 @@ A cada semana, atualizar contagem:
 
 **Sprint 1 (2026-05-23):** B7, A2, B3, B4, B2, B6, A6 (parte 1), A4, D2, D3, A8, A3.
 12 deliverables em uma sessão. 13 arquivos modificados / 6 criados.
+
+**Patch 2026-05-24 — Firebase config audit:**
+- iOS `GoogleService-Info.plist`: `IS_ANALYTICS_ENABLED=true` (estava `false`, contradizia A8)
+- Android: plugin `com.google.firebase.crashlytics` adicionado em `settings.gradle.kts` + `app/build.gradle.kts`
+- `web/env.js`: neutralizado (`Object.freeze({})`) com warning anti-vazamento
+- `.firebaserc`: alias `prod` + `targets.hitlook-app.hosting` configurados
+- `planning/FIREBASE_PROJECT.md` criado — referência completa dos comandos `firebase` para esse projeto
 
 ---
 
