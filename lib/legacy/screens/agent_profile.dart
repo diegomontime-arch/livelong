@@ -479,7 +479,10 @@ String agentInitials(String nome) {
     }
   }
 
-  return words.take(2).map((w) => w[0].toUpperCase()).join();
+  return words
+      .take(2)
+      .map((w) => w.isEmpty ? '?' : w[0].toUpperCase())
+      .join();
 }
 
 /// "diego-teste" → "Diego Teste"

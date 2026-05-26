@@ -63,13 +63,21 @@ bool isRealPublicAgent(AgentProfile profile, String agentId) {
 String _two(int n) => n.toString().padLeft(2, '0');
 
 /// Formata data/hora sem depender de [initializeDateFormatting] (evita LocaleDataException na web).
-String formatLeadDate(dynamic value, {String locale = 'pt_BR'}) {
-  DateTime? dt;
-  if (value is Timestamp) {
-    dt = value.toDate();
-  } else if (value is DateTime) {
-    dt = value;
+DateTime? parseLeadDateTime(dynamic value) {
+  if (value is Timestamp) return value.toDate();
+  if (value is DateTime) return value;
+  if (value is int) {
+    final ms = value > 9999999999 ? value : value * 1000;
+    return DateTime.fromMillisecondsSinceEpoch(ms);
   }
+  if (value is String && value.isNotEmpty) {
+    return DateTime.tryParse(value);
+  }
+  return null;
+}
+
+String formatLeadDate(dynamic value, {String locale = 'pt_BR'}) {
+  final dt = parseLeadDateTime(value);
   if (dt == null) return '—';
   return '${_two(dt.day)}/${_two(dt.month)}/${dt.year} ${_two(dt.hour)}:${_two(dt.minute)}';
 }
@@ -93,12 +101,8 @@ int leadDisplayScore(Map<String, dynamic> lead) {
   return int.tryParse('$score') ?? 0;
 }
 
-DateTime? leadCreatedAt(Map<String, dynamic> lead) {
-  final value = lead['createdAt'];
-  if (value is Timestamp) return value.toDate();
-  if (value is DateTime) return value;
-  return null;
-}
+DateTime? leadCreatedAt(Map<String, dynamic> lead) =>
+    parseLeadDateTime(lead['createdAt']);
 
 class FlowBackButton extends StatelessWidget {
   const FlowBackButton({super.key, this.onPressed});

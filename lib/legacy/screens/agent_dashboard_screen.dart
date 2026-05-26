@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -28,9 +29,15 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   String _publicLinkId = '';
   static const _pageSize = 15;
 
+  void _dashboardLog(String message) {
+    debugPrint(message);
+    if (kIsWeb) print(message);
+  }
+
   @override
   void initState() {
     super.initState();
+    _dashboardLog('[Dashboard] initState — mounting AgentDashboardScreen');
     _loadData();
   }
 
@@ -68,7 +75,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   Future<QuerySnapshot<Map<String, dynamic>>> _queryRootLeadsUnordered(
     String uid,
   ) async {
-    debugPrint('[Dashboard] leads query (unordered): agentId == $uid');
+    _dashboardLog('[Dashboard] leads query (unordered): agentId == $uid');
     return FirebaseFirestore.instance
         .collection('leads')
         .where('agentId', isEqualTo: uid)
@@ -77,8 +84,8 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   }
 
   Future<List<Map<String, dynamic>>> _fetchRootLeads(String uid) async {
-    debugPrint('[Dashboard] uid=$uid');
-    debugPrint('[Dashboard] leads query: agentId == uid');
+    _dashboardLog('[Dashboard] uid=$uid');
+    _dashboardLog('[Dashboard] leads query: agentId == uid');
 
     QuerySnapshot<Map<String, dynamic>> snapshot;
     try {
@@ -88,23 +95,23 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
           .orderBy('createdAt', descending: true)
           .limit(_pageSize)
           .get();
-      debugPrint(
+      _dashboardLog(
         '[Dashboard] root leads (ordered): ${snapshot.docs.length} docs',
       );
       // orderBy omits documents without createdAt — retry if empty but data may exist.
       if (snapshot.docs.isEmpty) {
         snapshot = await _queryRootLeadsUnordered(uid);
-        debugPrint(
+        _dashboardLog(
           '[Dashboard] root leads (unordered retry): ${snapshot.docs.length} docs',
         );
       }
     } on FirebaseException catch (e) {
-      debugPrint(
+      _dashboardLog(
         '[Dashboard] root leads ordered error: code=${e.code} message=${e.message}',
       );
       if (e.code != 'failed-precondition') rethrow;
       snapshot = await _queryRootLeadsUnordered(uid);
-      debugPrint(
+      _dashboardLog(
         '[Dashboard] root leads (index fallback): ${snapshot.docs.length} docs',
       );
     }
@@ -188,13 +195,13 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
   }
 
   Future<void> _loadData({bool refresh = false}) async {
-    debugPrint(
+    _dashboardLog(
       '[Dashboard] uid=${FirebaseAuth.instance.currentUser?.uid}',
     );
 
     final uid = await _resolveUid();
     if (uid == null) {
-      debugPrint('[Dashboard] uid resolve failed — not signed in');
+      _dashboardLog('[Dashboard] uid resolve failed — not signed in');
       if (mounted) {
         setState(() {
           _loading = false;
@@ -204,7 +211,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
       return;
     }
 
-    debugPrint('[Dashboard] resolved uid=$uid');
+    _dashboardLog('[Dashboard] resolved uid=$uid');
 
     if (refresh) {
       setState(() {
@@ -217,35 +224,35 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     try {
       // Leads first — do not block on profile / public link resolution.
       final rootLeads = await _fetchRootLeads(uid);
-      debugPrint('[Dashboard] rootLeads count=${rootLeads.length}');
+      _dashboardLog('[Dashboard] rootLeads count=${rootLeads.length}');
 
       var agent = _agent;
       try {
         agent = await AgentProvider.loadAgent(uid);
-        debugPrint(
+        _dashboardLog(
           '[Dashboard] agent loaded nome="${agent.nome}" saas=${agent.hasSaaSContext}',
         );
       } catch (e) {
-        debugPrint('[Dashboard] AgentProvider.loadAgent: $e');
+        _dashboardLog('[Dashboard] AgentProvider.loadAgent: $e');
       }
 
       String publicId = _publicLinkId;
       try {
         publicId = await AgentProvider.resolvePublicLinkId(uid);
       } catch (e) {
-        debugPrint('[Dashboard] resolvePublicLinkId: $e');
+        _dashboardLog('[Dashboard] resolvePublicLinkId: $e');
       }
 
       List<Map<String, dynamic>> companyLeads = const [];
       try {
         companyLeads = await _fetchCompanyLeads(agent);
-        debugPrint('[Dashboard] companyLeads count=${companyLeads.length}');
+        _dashboardLog('[Dashboard] companyLeads count=${companyLeads.length}');
       } catch (e) {
-        debugPrint('[Dashboard] company leads: $e');
+        _dashboardLog('[Dashboard] company leads: $e');
       }
 
       final merged = _mergeLeadRows(rootLeads, companyLeads);
-      debugPrint('[Dashboard] merged leads count=${merged.length}');
+      _dashboardLog('[Dashboard] merged leads count=${merged.length}');
 
       if (mounted) {
         setState(() {
@@ -258,7 +265,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         });
       }
     } on FirebaseException catch (e, st) {
-      debugPrint('[Dashboard] FirebaseException: ${e.code} ${e.message}\n$st');
+      _dashboardLog('[Dashboard] FirebaseException: ${e.code} ${e.message}\n$st');
       if (mounted) {
         setState(() {
           _loading = false;
@@ -268,7 +275,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         });
       }
     } catch (e, st) {
-      debugPrint('[Dashboard] load leads: $e\n$st');
+      _dashboardLog('[Dashboard] load leads: $e\n$st');
       if (mounted) {
         setState(() {
           _loading = false;
@@ -364,7 +371,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         });
       }
     } catch (e) {
-      debugPrint('[Dashboard] loadMore: $e');
+      _dashboardLog('[Dashboard] loadMore: $e');
       if (mounted) setState(() => _loadingMore = false);
     }
   }
@@ -423,19 +430,45 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _dashboardLog(
+      '[Dashboard] build loading=$_loading leads=${_leads.length} error=$_loadError',
+    );
+    try {
+      return _buildContent(context);
+    } catch (e, stack) {
+      _dashboardLog('[Dashboard] BUILD ERROR: $e');
+      _dashboardLog('[Dashboard] STACK: $stack');
+      return Scaffold(
+        backgroundColor: AppColors.black,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Erro no painel: $e',
+              style: const TextStyle(color: AppColors.white),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _buildContent(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.black,
       body: WatermarkBackground(
         child: SafeArea(
-          child: _loading
-              ? const FlowLoadingView(message: 'Carregando seu painel...')
-              : _loadError != null && _leads.isEmpty
-                  ? FlowErrorView(
-                      message: _loadError!,
-                      onRetry: () => _loadData(refresh: true),
-                    )
-                  : Column(
-                  children: [
+          child: SizedBox.expand(
+            child: _loading
+                ? const FlowLoadingView(message: 'Carregando seu painel...')
+                : _loadError != null && _leads.isEmpty
+                    ? FlowErrorView(
+                        message: _loadError!,
+                        onRetry: () => _loadData(refresh: true),
+                      )
+                    : Column(
+                        children: [
                     // Header
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -510,7 +543,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                                 ),
                               ),
                               PopupMenuItem(
-                                onTap: _logout,
+                                onTap: () => _logout(),
                                 child: const Row(
                                   children: [
                                     Icon(Icons.logout,
@@ -739,17 +772,33 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                                       ),
                                     );
                                   }
-                                  return _LeadCard(
-                                    lead: _leads[i],
-                                    onTap: () => _showLeadDetail(_leads[i]),
-                                  );
+                                  final lead = _leads[i];
+                                  try {
+                                    return _LeadCard(
+                                      lead: lead,
+                                      onTap: () => _showLeadDetail(lead),
+                                    );
+                                  } catch (e, st) {
+                                    _dashboardLog(
+                                      '[Dashboard] LeadCard[$i] error: $e\n$st',
+                                    );
+                                    return const ListTile(
+                                      title: Text(
+                                        'Lead indisponível',
+                                        style: TextStyle(
+                                          color: AppColors.greyLight,
+                                        ),
+                                      ),
+                                    );
+                                  }
                                 },
                               ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                        ],
+                      ),
+          ),
         ),
       ),
     );
@@ -773,21 +822,22 @@ class _LeadCard extends StatelessWidget {
     final status = normalizeLeadStatus(lead['status']?.toString());
     final meta = dashboardLeadStatusMeta(status);
     final lang = lead['lang']?.toString() ?? 'pt';
+    final dateLabel = formatLeadDate(lead['createdAt']);
 
-    return Material(
+    return Card(
+      margin: EdgeInsets.zero,
       color: AppColors.blackCard,
-      borderRadius: BorderRadius.circular(10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: AppColors.gold.withValues(alpha: 0.12),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
+        child: Padding(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: AppColors.gold.withValues(alpha: 0.12),
-            ),
-          ),
           child: Row(
             children: [
               Container(
@@ -832,7 +882,7 @@ class _LeadCard extends StatelessWidget {
                         ),
                       ),
                     Text(
-                      formatLeadDate(lead['createdAt']),
+                      dateLabel,
                       style: TextStyle(
                         fontSize: 11,
                         color: AppColors.grey.withValues(alpha: 0.8),

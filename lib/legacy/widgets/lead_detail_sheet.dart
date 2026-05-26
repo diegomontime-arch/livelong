@@ -26,7 +26,7 @@ class _LeadDetailSheetState extends State<LeadDetailSheet> {
   @override
   void initState() {
     super.initState();
-    _status = normalizeLeadStatus(widget.lead['status'] as String?);
+    _status = normalizeLeadStatus(widget.lead['status']?.toString());
   }
 
   @override

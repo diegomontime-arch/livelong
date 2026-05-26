@@ -188,7 +188,8 @@ class WatermarkBackground extends StatelessWidget {
           right: 14,
           child: IgnorePointer(child: _AiIndicator()),
         ),
-        child,
+        // Fill constraints so Column+Expanded (dashboard, admin) layout safely.
+        Positioned.fill(child: child),
       ],
     );
   }
