@@ -4,8 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
-
 import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
@@ -62,6 +60,9 @@ bool isRealPublicAgent(AgentProfile profile, String agentId) {
       profile.hasSaaSContext;
 }
 
+String _two(int n) => n.toString().padLeft(2, '0');
+
+/// Formata data/hora sem depender de [initializeDateFormatting] (evita LocaleDataException na web).
 String formatLeadDate(dynamic value, {String locale = 'pt_BR'}) {
   DateTime? dt;
   if (value is Timestamp) {
@@ -70,7 +71,7 @@ String formatLeadDate(dynamic value, {String locale = 'pt_BR'}) {
     dt = value;
   }
   if (dt == null) return '—';
-  return DateFormat('dd/MM/yyyy HH:mm', locale).format(dt);
+  return '${_two(dt.day)}/${_two(dt.month)}/${dt.year} ${_two(dt.hour)}:${_two(dt.minute)}';
 }
 
 String leadDisplayName(Map<String, dynamic> lead) {
