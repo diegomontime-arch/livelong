@@ -340,7 +340,85 @@ Itens que não bloqueiam release nem operação imediata.
 
 ---
 
-## Fase E — Pós-release e v1.1+ (planejamento)
+## QA Sprint 2 — Validação no Simulator iPhone 17 (2026-05-26)
+
+Build rodou no simulator do iPhone 17 (iOS 26.4) com sucesso após
+correções da task #32. Validação **parcial** — login do agente precisa
+de credenciais para destravar telas Sprint 2 (Settings/Legal/Delete).
+
+### ✅ Validado funcionando
+
+- **Splash → Language Screen** transição correta, logo M4LIFE
+- **Disclaimer A4 — Language Screen** visível com texto "Educational
+  tool. Not insurance advice. Recommendations come from your licensed
+  agent." abaixo de "AI · PROTECTION · SALES"
+- **Welcome screen** renderiza com M4LIFE branding ("Se algo
+  acontecer com você...")
+- **Onboarding** abre com 3 campos (Nome, Telefone, Data nascimento)
+- **Phone formatter** funciona — digitando `13055551234` resulta em
+  `(305) 555-1234` automaticamente
+- **Numeric keypad** apropriado para campo Telefone
+- **Login do agente** abre via "Área do Agente"
+- **Disclaimer regulatório no login** — "Ferramenta educacional. Não
+  constitui aconselhamento de seguros." visível no rodapé do login
+- **Botão back** funciona em todas as telas testadas
+- **i18n** estável — UI em PT renderiza certo
+
+### 🐛 Bugs encontrados
+
+#### BUG-Q1 — Onboarding não scrolla com keyboard aberto ✅ Corrigido
+
+- **Tela:** `language_screen.dart` (onboarding flow após selecionar
+  idioma e clicar "DESCOBRIR MEU NÍVEL")
+- **Sintoma:** quando o usuário toca em "Telefone" e o numeric keypad
+  do iOS sobe, o campo "Data de nascimento" fica completamente
+  escondido atrás do teclado.
+- **Fix aplicado (2026-05-26):** o `SingleChildScrollView` (L1229) agora
+  usa padding-bottom dinâmico:
+  ```dart
+  padding: EdgeInsets.only(
+    left: 28, right: 28,
+    bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+  ),
+  ```
+  Quando o keyboard sobe, o padding cresce e o scroll permite alcançar
+  o campo. Validar após próximo hot reload.
+
+#### BUG-Q2 — Auto-capitalização do nome inconsistente ✅ Corrigido
+
+- **Tela:** onboarding, campo "Nome completo"
+- **Sintoma:** ao digitar "maria" o resultado final no Firestore poderia
+  ser "maria" (lowercase). O agente verá um nome assim no dashboard.
+- **Fix aplicado (2026-05-26):**
+  1. Adicionado parâmetro `textCapitalization` no widget `_Campo`
+     (default `TextCapitalization.none`).
+  2. O `_Campo` do **Nome** agora passa `TextCapitalization.words`
+     (primeira letra de cada palavra automaticamente capitalizada).
+  3. Outros campos (Telefone, Data) mantêm `.none` pois não fazem sentido.
+
+#### BUG-Q3 — Não foi possível validar Settings, Legal e Delete account
+
+- **Motivo:** as 3 telas do Sprint 2 (P1, P2, P4) só são acessíveis
+  após login do agente. Sem credenciais de teste, não conseguimos
+  validar:
+  - `/settings` (SettingsScreen)
+  - `/legal/privacy` e `/legal/terms` (LegalScreen WebView)
+  - Botão "Excluir minha conta" + re-auth dialog + Cloud Function
+- **Próximo passo:** Yuri/Diego fornece credenciais de teste OU faz o
+  login manualmente e me chama de volta a partir do dashboard.
+
+### ⚠️ Limitações conhecidas do QA workflow (não bug do app)
+
+- **Computer-use `type` não entrega texto para Flutter TextField via
+  hardware keyboard** no simulator — precisei usar software keyboard
+  do iOS (Toggle Software Keyboard no menu I/O). Limitação da camada
+  flutter↔iOS↔macOS simulator, não bug do app. Em iPhone real, o
+  teclado nativo funciona normal.
+- **Cursor agent ficou com Connection Error** durante a sessão (não
+  afeta o build do app, mas alguns rebuilds/lints podem estar
+  pendentes).
+
+
 
 ### E1 — Sign in with Apple
 - v1.0 não exige (só email/password hoje). [APPLE_RELEASE.md §3](APPLE_RELEASE.md)

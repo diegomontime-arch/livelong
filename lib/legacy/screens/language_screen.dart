@@ -1227,7 +1227,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: FadeTransition(
               opacity: _fadeIn,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
+                // BUG-Q1 fix: adiciona padding-bottom dinâmico igual à altura
+                // do teclado, garantindo que campo "Data de nascimento" suba
+                // acima do keyboard quando focado (Apple HIG).
+                padding: EdgeInsets.only(
+                  left: 28,
+                  right: 28,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+                ),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -1276,6 +1283,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       icon: Icons.person_outline,
                       tipo: TextInputType.name,
                       erro: _t('e_name'),
+                      // BUG-Q2 fix: capitaliza primeira letra de cada palavra
+                      // (Maria Silva, não maria silva).
+                      textCapitalization: TextCapitalization.words,
                     ),
                     const SizedBox(height: 16),
                     _Campo(
@@ -1383,6 +1393,7 @@ class _Campo extends StatelessWidget {
   final int? minPhoneDigits;
   final String? lengthErro;
   final String? helpText;
+  final TextCapitalization textCapitalization;
 
   const _Campo({
     required this.ctrl,
@@ -1396,6 +1407,7 @@ class _Campo extends StatelessWidget {
     this.minPhoneDigits,
     this.lengthErro,
     this.helpText,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   @override
@@ -1414,6 +1426,7 @@ class _Campo extends StatelessWidget {
           controller: ctrl,
           keyboardType: tipo,
           inputFormatters: inputFormatters,
+          textCapitalization: textCapitalization,
           style: const TextStyle(
               color: AppColors.whiteWarm, fontSize: 15),
           validator: (v) {
