@@ -288,6 +288,136 @@ String _prospectToAgentMessage({
       'Gostaria de saber mais sobre as opções disponíveis para minha família.';
 }
 
+/// Rule-based approach guide for the agent (appended to prospect WhatsApp message).
+String generateApproachSuggestion({
+  required String lang,
+  required int score,
+  required Map<String, dynamic> answers,
+}) {
+  final l = _whatsappLang(lang);
+  final dependentes = answers['dependentes'] is int
+      ? answers['dependentes'] as int
+      : int.tryParse('${answers['dependentes']}') ?? 0;
+  final seguro = answers['seguro'] is int
+      ? answers['seguro'] as int
+      : int.tryParse('${answers['seguro']}') ?? 0;
+  final preocupacao = answers['preocupacao']?.toString() ?? '';
+
+  final tips = <String>[];
+  late final String urgencia;
+
+  if (score < 30) {
+    urgencia = l == 'en'
+        ? '\u{1F534} HIGH PRIORITY'
+        : l == 'es'
+            ? '\u{1F534} PRIORIDAD ALTA'
+            : '\u{1F534} PRIORIDADE ALTA';
+  } else if (score < 60) {
+    urgencia = l == 'en'
+        ? '\u{1F7E1} MEDIUM PRIORITY'
+        : l == 'es'
+            ? '\u{1F7E1} PRIORIDAD MEDIA'
+            : '\u{1F7E1} PRIORIDADE MÉDIA';
+  } else {
+    urgencia = l == 'en'
+        ? '\u{1F7E2} UPGRADE OPPORTUNITY'
+        : l == 'es'
+            ? '\u{1F7E2} OPORTUNIDAD DE MEJORA'
+            : '\u{1F7E2} OPORTUNIDADE DE UPGRADE';
+  }
+
+  if (dependentes >= 2) {
+    if (l == 'pt') {
+      tips.add('→ Família grande — cobertura para todos os membros');
+      tips.add(
+        '→ Educação universitária nos EUA custa \$50K-\$200K por filho — aborde isso',
+      );
+    } else if (l == 'es') {
+      tips.add('→ Familia grande — cobertura para todos los miembros');
+      tips.add(
+        '→ Universidad en EE.UU. cuesta \$50K-\$200K por hijo — menciona esto',
+      );
+    } else {
+      tips.add('→ Large family — coverage for all members');
+      tips.add('→ US college costs \$50K-\$200K per child — bring this up');
+    }
+  }
+
+  if (preocupacao == 'educacao' ||
+      preocupacao == 'educación' ||
+      preocupacao == 'education') {
+    if (l == 'pt') {
+      tips.add(
+        '→ Foco em educação — mostre como seguro financia faculdade dos filhos',
+      );
+    } else if (l == 'es') {
+      tips.add(
+        '→ Enfocado en educación — muestra cómo el seguro financia la universidad',
+      );
+    } else {
+      tips.add('→ Education focused — show how insurance funds college');
+    }
+  }
+
+  if (preocupacao == 'dividas' ||
+      preocupacao == 'deudas' ||
+      preocupacao == 'debts') {
+    if (l == 'pt') {
+      tips.add(
+        '→ Tem dívidas — Living Benefit protege família se adoecer e não puder trabalhar',
+      );
+    } else if (l == 'es') {
+      tips.add(
+        '→ Tiene deudas — Living Benefit protege familia si se enferma',
+      );
+    } else {
+      tips.add('→ Has debts — Living Benefit protects family if unable to work');
+    }
+  }
+
+  if (preocupacao == 'familia' || preocupacao == 'family') {
+    if (l == 'pt') {
+      tips.add(
+        '→ Preocupado com família — argumento emocional: "e se algo acontecer com você amanhã?"',
+      );
+    } else if (l == 'es') {
+      tips.add(
+        '→ Preocupado por familia — argumento: "¿qué pasa si algo te ocurre mañana?"',
+      );
+    } else {
+      tips.add(
+        '→ Family focused — emotional: "what happens to them if something happens to you?"',
+      );
+    }
+  }
+
+  if (seguro == 0) {
+    if (l == 'pt') {
+      tips.add('→ Sem proteção atual — urgência máxima, família 100% vulnerável');
+    } else if (l == 'es') {
+      tips.add('→ Sin protección actual — urgencia máxima, familia 100% vulnerable');
+    } else {
+      tips.add('→ No current coverage — maximum urgency, family 100% vulnerable');
+    }
+  }
+
+  if (l == 'pt') {
+    tips.add('→ Sempre mencione o Benefício em Vida — diferencial M4LIFE');
+  } else if (l == 'es') {
+    tips.add('→ Siempre menciona el Beneficio en Vida — diferencial M4LIFE');
+  } else {
+    tips.add('→ Always mention the Living Benefit — M4LIFE differentiator');
+  }
+
+  final header = l == 'en'
+      ? '\u{1F4CB} AGENT APPROACH GUIDE'
+      : l == 'es'
+          ? '\u{1F4CB} GUÍA DE ABORDAJE (AGENTE)'
+          : '\u{1F4CB} GUIA DE ABORDAGEM (AGENTE)';
+
+  return '\n\n$header\n$urgencia\n${tips.join('\n')}';
+}
+
 /// WhatsApp message text. Use [prospectToAgent] when the prospect contacts the agent.
 String buildLeadWhatsAppMessage({
   required String lang,
@@ -308,12 +438,19 @@ String buildLeadWhatsAppMessage({
     return _agentOutreachMessage(lang: lang, score: score, nome: nome);
   }
 
-  return _prospectToAgentMessage(
+  final resolvedAnswers = answers ?? const <String, dynamic>{};
+  final prospectMessage = _prospectToAgentMessage(
     lang: lang,
     score: score,
     nome: name,
     telefone: phone,
     nascimento: nascimento?.trim() ?? '',
-    answers: answers ?? const {},
+    answers: resolvedAnswers,
   );
+  final suggestion = generateApproachSuggestion(
+    lang: lang,
+    score: score,
+    answers: resolvedAnswers,
+  );
+  return '$prospectMessage$suggestion';
 }
