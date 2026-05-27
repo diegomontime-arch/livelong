@@ -36,6 +36,19 @@ String normalizeWhatsAppNumber(String raw) {
   return formatWhatsAppNumber(raw);
 }
 
+/// US-style display only (e.g. 17868525672 → +1 (786) 852-5672). Not for wa.me links.
+String formatPhoneForWhatsAppMessage(String raw) {
+  final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
+  if (digits.length == 11 && digits.startsWith('1')) {
+    return '+1 (${digits.substring(1, 4)}) ${digits.substring(4, 7)}-${digits.substring(7)}';
+  }
+  if (digits.length == 10) {
+    return '+1 (${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6)}';
+  }
+  final trimmed = raw.trim();
+  return trimmed.isNotEmpty ? trimmed : digits;
+}
+
 /// Builds the wa.me URI (https://wa.me/NUM?text=...).
 Uri buildWhatsAppUri({required String phone, required String message}) {
   final numero = phone.trim().isEmpty
@@ -225,9 +238,12 @@ String _prospectToAgentMessage({
   required int score,
   required String nome,
   required String telefone,
+  required String nascimento,
   required Map<String, dynamic> answers,
 }) {
   final l = _whatsappLang(lang);
+  final phoneDisplay = formatPhoneForWhatsAppMessage(telefone);
+  final birthDisplay = nascimento.trim().isNotEmpty ? nascimento.trim() : '—';
   final dependentes = _formatDependentes(l, answers['dependentes']);
   final renda = _formatRenda(l, answers['renda']);
   final seguro = _formatSeguro(l, answers['seguro']);
@@ -236,7 +252,8 @@ String _prospectToAgentMessage({
   if (l == 'es') {
     return '\u{1F514} ¡Hola! Acabo de hacer el diagnóstico de protección familiar por M4LIFE USA.\n\n'
         '\u{1F464} Mi nombre: $nome\n'
-        '\u{1F4F1} Mi teléfono: $telefone\n'
+        '\u{1F4F1} Mi teléfono: $phoneDisplay\n'
+        '\u{1F382} Fecha de nacimiento: $birthDisplay\n'
         '\u{2B50} Mi score: $score% de protección\n\n'
         '\u{1F4CA} Mi perfil:\n'
         '\u{2022} Dependientes: $dependentes\n'
@@ -248,7 +265,8 @@ String _prospectToAgentMessage({
   if (l == 'en') {
     return '\u{1F514} Hi! I just completed the family protection diagnosis through M4LIFE USA.\n\n'
         '\u{1F464} My name: $nome\n'
-        '\u{1F4F1} My phone: $telefone\n'
+        '\u{1F4F1} My phone: $phoneDisplay\n'
+        '\u{1F382} Date of birth: $birthDisplay\n'
         '\u{2B50} My score: $score% protection level\n\n'
         '\u{1F4CA} My profile:\n'
         '\u{2022} Dependents: $dependentes\n'
@@ -259,7 +277,8 @@ String _prospectToAgentMessage({
   }
   return '\u{1F514} Olá! Acabei de fazer o diagnóstico de proteção familiar pela M4LIFE USA.\n\n'
       '\u{1F464} Meu nome: $nome\n'
-      '\u{1F4F1} Meu telefone: $telefone\n'
+      '\u{1F4F1} Meu telefone: $phoneDisplay\n'
+      '\u{1F382} Data de nascimento: $birthDisplay\n'
       '\u{2B50} Meu score: $score% de proteção\n\n'
       '\u{1F4CA} Meu perfil:\n'
       '\u{2022} Dependentes: $dependentes\n'
@@ -275,6 +294,7 @@ String buildLeadWhatsAppMessage({
   required int score,
   String? nome,
   String? telefone,
+  String? nascimento,
   Map<String, dynamic>? answers,
   bool prospectToAgent = false,
 }) {
@@ -293,6 +313,7 @@ String buildLeadWhatsAppMessage({
     score: score,
     nome: name,
     telefone: phone,
+    nascimento: nascimento?.trim() ?? '',
     answers: answers ?? const {},
   );
 }

@@ -339,6 +339,7 @@ class _ResultScreenState extends State<ResultScreen>
       score: _score,
       nome: widget.nome,
       telefone: widget.telefone,
+      nascimento: widget.nascimento,
       answers: widget.answers,
       prospectToAgent: true,
     );
