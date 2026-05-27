@@ -38,6 +38,16 @@ class _LeadDetailSheetState extends State<LeadDetailSheet> {
     final lang = lead['lang']?.toString() ?? 'pt';
     final nascimento = lead['nascimento']?.toString() ?? '';
     final answers = lead['answers'];
+    final answersMap = answers is Map<String, dynamic>
+        ? answers
+        : answers is Map
+            ? Map<String, dynamic>.from(answers)
+            : const <String, dynamic>{};
+    final approachGuide = generateApproachSuggestion(
+      lang: lang,
+      score: scoreInt,
+      answers: answersMap,
+    ).trim();
     final meta = dashboardLeadStatusMeta(_status);
 
     return SafeArea(
@@ -223,6 +233,28 @@ class _LeadDetailSheetState extends State<LeadDetailSheet> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF25D366),
                     foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+            if (approachGuide.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.black,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: Text(
+                  approachGuide,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.whiteWarm,
+                    height: 1.45,
                   ),
                 ),
               ),

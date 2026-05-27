@@ -438,19 +438,12 @@ String buildLeadWhatsAppMessage({
     return _agentOutreachMessage(lang: lang, score: score, nome: nome);
   }
 
-  final resolvedAnswers = answers ?? const <String, dynamic>{};
-  final prospectMessage = _prospectToAgentMessage(
+  return _prospectToAgentMessage(
     lang: lang,
     score: score,
     nome: name,
     telefone: phone,
     nascimento: nascimento?.trim() ?? '',
-    answers: resolvedAnswers,
+    answers: answers ?? const <String, dynamic>{},
   );
-  final suggestion = generateApproachSuggestion(
-    lang: lang,
-    score: score,
-    answers: resolvedAnswers,
-  );
-  return '$prospectMessage$suggestion';
 }
