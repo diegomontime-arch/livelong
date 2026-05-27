@@ -43,8 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-# Local-only Ana chat (API via Cloudflare Worker — copy from .example)
-lib/legacy/screens/chat_screen.dart
+# Ana chat — was excluded when it had a hardcoded Anthropic key. Since
+# 2026-04 the key lives in the Cloudflare Worker (hitlook-ana-proxy) and
+# the file is safe to version (verified 2026-05-26). Keeping it tracked
+# stops the "file disappears on clean" footgun (planning/CHANGELOG.md).
 
 # Seed scripts — secrets
 scripts/seed/.env

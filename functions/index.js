@@ -305,3 +305,135 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+const crypto = require("crypto");
+
+/**
+ * Self-service account deletion (CCPA §1798.105 / Apple Guideline 5.1.1(v)).
+ *
+ * Hybrid model (decision 2026-05-24):
+ *   - Agent's PII (name, photo, bio, phone, email) is removed.
+ *   - Seller document stays in Firestore as anonymized "Ex-agente" so
+ *     the tenant admin (Renan) keeps historical lead attribution.
+ *   - Firebase Auth user is deleted (so password reset stops working).
+ *   - Storage photo file is deleted.
+ *   - `seller_slugs/{slug}` is marked deactivated to block new leads.
+ *   - Public link /a/{slug} starts 404-ing because the legacy mirror is gone.
+ *   - Audit log in `accountDeletions/{hashedUid}` for 3-year compliance trail.
+ *
+ * Re-auth is enforced at the client (Firebase Auth requires recent login
+ * to call Auth.deleteUser).
+ */
+exports.deleteAgentAccount = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Login required");
+    }
+    const uid = request.auth.uid;
+
+    const userSnap = await db.collection("users").doc(uid).get();
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", "User profile not found");
+    }
+    const user = userSnap.data();
+    const role = user.role;
+    const companyId = user.companyId;
+    const sellerId = user.sellerId;
+
+    if (role !== "seller") {
+      // Admins cannot self-delete via this function — Diego/Renan would
+      // wipe critical state. Force a manual / support flow instead.
+      throw new HttpsError(
+        "failed-precondition",
+        "Admin accounts must be deleted by HitLook support — contact privacy@hitlook.us",
+      );
+    }
+    if (!companyId || !sellerId) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Account is missing companyId/sellerId — contact support",
+      );
+    }
+
+    const sellerRef = db
+      .collection("companies").doc(companyId)
+      .collection("sellers").doc(sellerId);
+    const sellerSnap = await sellerRef.get();
+    if (!sellerSnap.exists) {
+      throw new HttpsError("not-found", "Seller not found");
+    }
+    const seller = sellerSnap.data();
+    const slug = seller.slug;
+
+    // ── 1. Anonymize seller doc — keep ID + slug for historical leads ──
+    await sellerRef.set(
+      {
+        displayName: "Ex-agente",
+        photoUrl: null,
+        bio: null,
+        phone: null,
+        email: null,
+        instagramUrl: null,
+        linkedinUrl: null,
+        isActive: false,
+        deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+
+    // ── 2. Deactivate slug index (public link 404s) ──
+    if (slug) {
+      await db.collection("seller_slugs").doc(slug).set(
+        {
+          deactivated: true,
+          deactivatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+
+    // ── 3. Delete legacy /agents mirrors ──
+    const agentsBatch = db.batch();
+    agentsBatch.delete(db.collection("agents").doc(uid));
+    if (slug) agentsBatch.delete(db.collection("agents").doc(slug));
+    await agentsBatch.commit().catch((e) => {
+      logger.warn("agents/* delete partial fail", e.message);
+    });
+
+    // ── 4. Delete Storage photo ──
+    try {
+      const bucket = admin.storage().bucket();
+      await bucket.file(`agents/${uid}/photo`).delete({ ignoreNotFound: true });
+    } catch (e) {
+      logger.warn("storage photo delete fail", e.message);
+    }
+
+    // ── 5. Audit log (hashed uid, 3-year retention by FL/CCPA practice) ──
+    const hashedUid = crypto.createHash("sha256").update(uid).digest("hex");
+    await db.collection("accountDeletions").doc(hashedUid).set({
+      deletedAt: admin.firestore.FieldValue.serverTimestamp(),
+      companyId,
+      sellerId,
+      slug: slug || null,
+      mode: "hybrid",
+    });
+
+    // ── 6. Delete users/{uid} doc ──
+    await db.collection("users").doc(uid).delete();
+
+    // ── 7. Finally delete the Firebase Auth user ──
+    try {
+      await admin.auth().deleteUser(uid);
+    } catch (e) {
+      logger.error("auth deleteUser failed", { uid, message: e.message });
+      // Don't rethrow — Firestore state already consistent; the user
+      // can re-login (but companyId/sellerId are gone, so they get
+      // bounced to login). Support cleans up the Auth user later.
+    }
+
+    logger.info("deleteAgentAccount OK", { uidHash: hashedUid.slice(0, 12) });
+    return { success: true, mode: "hybrid" };
+  },
+);

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 
 import 'package:hitlook/core/constants/firestore_paths.dart';
@@ -73,6 +74,18 @@ class AdminSession {
 
       final role = UserRole.fromString(data['role'] as String?);
       debugPrint('[HitLook:AdminSession] load OK role=${role.name} company=$companyId');
+
+      // ── Crashlytics context (planning/CHECKLIST.md P5) ──────────────
+      // setUserIdentifier accepts an opaque string; Firebase UID is fine
+      // and is not considered PII when disconnected from the email.
+      try {
+        FirebaseCrashlytics.instance.setUserIdentifier(uid);
+        FirebaseCrashlytics.instance.setCustomKey('role', role.name);
+        FirebaseCrashlytics.instance.setCustomKey('companyId', companyId);
+      } catch (_) {
+        // Crashlytics may be uninitialized in tests; ignore.
+      }
+
       return AdminSession(
         userId: uid,
         companyId: companyId,

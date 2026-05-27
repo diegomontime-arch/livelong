@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:hitlook/core/constants/route_paths.dart';
 import 'package:hitlook/core/routing/route_guards.dart';
 import 'package:hitlook/core/utils/public_agent_slug.dart';
+import 'package:hitlook/features/legal/presentation/legal_screen.dart';
+import 'package:hitlook/features/settings/presentation/settings_screen.dart';
 import 'package:hitlook/legacy/screens/admin_company_screen.dart';
 import 'package:hitlook/legacy/screens/admin_dashboard_screen.dart';
 import 'package:hitlook/legacy/screens/admin_seller_leads_screen.dart';
@@ -86,6 +88,24 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: RoutePaths.sellerProfile,
       builder: (context, state) => const AgentSetupScreen(),
+    ),
+    GoRoute(
+      path: RoutePaths.settings,
+      builder: (context, state) => const SettingsScreen(),
+    ),
+    GoRoute(
+      path: RoutePaths.legalPrivacy,
+      builder: (context, state) {
+        final lang = state.uri.queryParameters['lang'] ?? 'en';
+        return LegalScreen(document: LegalDocument.privacy, lang: lang);
+      },
+    ),
+    GoRoute(
+      path: RoutePaths.legalTerms,
+      builder: (context, state) {
+        final lang = state.uri.queryParameters['lang'] ?? 'en';
+        return LegalScreen(document: LegalDocument.terms, lang: lang);
+      },
     ),
   ],
 );

@@ -279,37 +279,10 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
         _dashboardLog('[Dashboard] company leads: $e');
       }
 
-      // Run the three independent reads in parallel — D2 in planning/CHECKLIST.md.
-      // resolvePublicLinkId(uid), _fetchRootLeads(uid) and _fetchCompanyLeads(agent)
-      // were previously sequential, adding ~1 round-trip each on slow networks.
-      final results = await Future.wait<dynamic>([
-        AgentProvider.resolvePublicLinkId(uid),
-        runWithTimeout(() => _fetchRootLeads(uid)),
-        _fetchCompanyLeads(agent).catchError((e) {
-          debugPrint('[Dashboard] company leads: $e');
-          return const <Map<String, dynamic>>[];
-        }),
-      ]);
-
-      final String? publicId = results[0] as String?;
-      final List<Map<String, dynamic>>? rootLeads =
-          results[1] as List<Map<String, dynamic>>?;
-      final List<Map<String, dynamic>> companyLeads =
-          (results[2] as List<Map<String, dynamic>>?) ??
-              const <Map<String, dynamic>>[];
-
-      if (mounted) setState(() => _publicLinkId = publicId);
-
-      if (rootLeads == null) {
-        if (mounted) {
-          setState(() {
-            _loading = false;
-            _loadError =
-                'Demorou demais para carregar. Verifique sua conexão e tente novamente.';
-          });
-        }
-        return;
-      }
+      // Note (D2 from planning/CHECKLIST.md): a previous patch tried to
+      // parallelize the three reads with `Future.wait`, but the version
+      // pulled from origin/main has tighter error handling per call. We
+      // keep the sequential version for now; revisit when adding retry.
 
       final merged = _mergeLeadRows(rootLeads, companyLeads);
       _dashboardLog('[Dashboard] merged leads count=${merged.length}');
@@ -597,6 +570,23 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                                         color: AppColors.gold, size: 16),
                                     SizedBox(width: 8),
                                     Text('Editar perfil',
+                                        style: TextStyle(
+                                            color: AppColors.white)),
+                                  ],
+                                ),
+                              ),
+                              PopupMenuItem(
+                                onTap: () {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                    if (context.mounted) context.go('/settings');
+                                  });
+                                },
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.settings_outlined,
+                                        color: AppColors.gold, size: 16),
+                                    SizedBox(width: 8),
+                                    Text('Configurações',
                                         style: TextStyle(
                                             color: AppColors.white)),
                                   ],

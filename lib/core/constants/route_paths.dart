@@ -6,6 +6,9 @@ abstract final class RoutePaths {
   static const admin = '/admin';
   static const sellerProfile = '/perfil';
   static const onboarding = '/onboarding';
+  static const settings = '/settings';
+  static const legalPrivacy = '/legal/privacy';
+  static const legalTerms = '/legal/terms';
 
   static String adminCompany(String companyId) => '$admin/companies/$companyId';
 

@@ -444,10 +444,23 @@ A cada semana, atualizar contagem:
 | 🟠 Alto risco (Fase B) | 10 | 5 | 50% |
 | 👤 Decisões (Fase C) | 5 | 0 | 0% |
 | 🟡 Dívidas (Fase D) | 10 | 2 | 20% |
-| **Total v1.0** | **35** | **11** | **31%** |
+| 🎨 Polish (POLISH_AUDIT) | 8 críticos | 5 | 62% |
+| **Total v1.0** | **43** | **16** | **37%** |
 
 **Sprint 1 (2026-05-23):** B7, A2, B3, B4, B2, B6, A6 (parte 1), A4, D2, D3, A8, A3.
 12 deliverables em uma sessão. 13 arquivos modificados / 6 criados.
+
+**Sprint 2 (2026-05-24) — Polish profissional vs Whenote:**
+- **P1** Account deletion in-app (hybrid mode) — Cloud Function `deleteAgentAccount` + UI Settings
+- **P2** `SettingsScreen` com Editar perfil, Privacidade, Termos, Sobre, Sair, Excluir conta
+- **P4** `LegalScreen` com WebView renderizando `/privacy.html` e `/terms.html`
+- **P5** Crashlytics context (`setUserIdentifier`, `setCustomKey('role'…)`)
+- **P8** Versão do app exibida no Settings via `package_info_plus`
+- Bloqueio de novos leads em seller `isActive: false` (rules)
+- Cores `gold`/`goldDim`/`whiteWarm` adicionadas ao `AppColors` central
+- Item "Configurações" no popup menu do dashboard
+- Rotas `/settings`, `/legal/privacy`, `/legal/terms` no `app_router`
+- Detalhes em [POLISH_AUDIT.md](POLISH_AUDIT.md)
 
 **Patch 2026-05-24 — Firebase config audit:**
 - iOS `GoogleService-Info.plist`: `IS_ANALYTICS_ENABLED=true` (estava `false`, contradizia A8)

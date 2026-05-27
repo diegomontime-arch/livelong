@@ -118,6 +118,7 @@ service cloud.firestore {
       let sellerId = data.sellerId;
 
       return sellerExists(companyId, sellerId)
+        && sellerData(companyId, sellerId).get('isActive', true) == true
         && data.companyId == companyId
         && data.sellerId == sellerId
         && data.status in ['new', 'novo']
