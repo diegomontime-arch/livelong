@@ -27,18 +27,19 @@ Future<void> bootstrap() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // ─── Crashlytics ───────────────────────────────────────────────
-  // Disable in debug to avoid polluting the dashboard; in release we
-  // capture both Flutter framework errors and unhandled Dart errors.
-  await FirebaseCrashlytics.instance
-      .setCrashlyticsCollectionEnabled(!kDebugMode);
+  // ─── Crashlytics (mobile only — not supported on Flutter Web) ───
+  if (!kIsWeb) {
+    await FirebaseCrashlytics.instance
+        .setCrashlyticsCollectionEnabled(!kDebugMode);
 
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    FlutterError.onError =
+        FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+  }
 
   // ─── Analytics ─────────────────────────────────────────────────
   // Default to enabled in release; the user can later opt out via UI when
