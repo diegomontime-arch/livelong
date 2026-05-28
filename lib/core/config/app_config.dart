@@ -8,7 +8,7 @@ abstract final class AppConfig {
 
   /// Cloud Function / hosting proxy for Anthropic (no API keys in the client).
   static const anthropicProxyUrl =
-      'https://hitlook-app.web.app/api/anthropic/v1/messages';
+      'https://hitlook-ana-proxy.hitlook.workers.dev/v1/messages';
 
   /// Base URL for seller public links shown in admin dashboard.
   static const publicWebBaseUrl = 'https://hitlook-app.web.app';

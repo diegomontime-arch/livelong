@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:webview_flutter/webview_flutter.dart';
 
 import 'package:hitlook/core/theme/app_colors.dart';
@@ -33,6 +37,7 @@ class _LegalScreenState extends State<LegalScreen> {
   late final WebViewController _controller;
   bool _loading = true;
   bool _hasError = false;
+  String? _webText;
 
   static const _hostBase = 'https://hitlook-app.web.app';
 
@@ -63,6 +68,10 @@ class _LegalScreenState extends State<LegalScreen> {
   @override
   void initState() {
     super.initState();
+    if (kIsWeb) {
+      _loadForWeb();
+      return;
+    }
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(AppColors.black)
@@ -72,10 +81,12 @@ class _LegalScreenState extends State<LegalScreen> {
             if (mounted) setState(() => _loading = false);
           },
           onWebResourceError: (_) {
-            if (mounted) setState(() {
-              _loading = false;
-              _hasError = true;
-            });
+            if (mounted) {
+              setState(() {
+                _loading = false;
+                _hasError = true;
+              });
+            }
           },
           // Block deep navigation away from the public legal pages.
           onNavigationRequest: (request) {
@@ -87,6 +98,68 @@ class _LegalScreenState extends State<LegalScreen> {
         ),
       )
       ..loadRequest(Uri.parse(_url));
+  }
+
+  Future<void> _loadForWeb() async {
+    try {
+      final response = await http.get(Uri.parse(_url));
+      if (response.statusCode != 200) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _hasError = true;
+        });
+        return;
+      }
+      final body = utf8.decode(response.bodyBytes);
+      if (!mounted) return;
+      setState(() {
+        _webText = _stripHtmlToPlainText(body);
+        _loading = false;
+        _hasError = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _hasError = true;
+      });
+    }
+  }
+
+  String _stripHtmlToPlainText(String html) {
+    final scriptTag = RegExp(r'<script[^>]*>.*?</script>',
+        caseSensitive: false, dotAll: true);
+    final styleTag =
+        RegExp(r'<style[^>]*>.*?</style>', caseSensitive: false, dotAll: true);
+    final brTag = RegExp(r'<br\s*/?>', caseSensitive: false);
+    final pClose = RegExp(r'</p>', caseSensitive: false);
+    final hClose = RegExp(r'</h[1-6]>', caseSensitive: false);
+    final liClose = RegExp(r'</li>', caseSensitive: false);
+    final anyTag = RegExp(r'<[^>]+>', caseSensitive: false, dotAll: true);
+
+    var text = html
+        .replaceAll(scriptTag, '')
+        .replaceAll(styleTag, '')
+        .replaceAll(brTag, '\n')
+        .replaceAll(pClose, '\n\n')
+        .replaceAll(hClose, '\n\n')
+        .replaceAll(liClose, '\n')
+        .replaceAll(anyTag, '');
+
+    // Minimal HTML entity decoding for readability.
+    text = text
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&#39;', "'");
+
+    // Normalize whitespace.
+    text = text.replaceAll(RegExp(r'[ \t]+\n'), '\n');
+    text = text.replaceAll(RegExp(r'\n{3,}'), '\n\n');
+    return text.trim();
   }
 
   @override
@@ -104,7 +177,20 @@ class _LegalScreenState extends State<LegalScreen> {
       ),
       body: Stack(
         children: [
-          if (!_hasError) WebViewWidget(controller: _controller),
+          if (!_hasError)
+            kIsWeb
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
+                    child: SelectableText(
+                      (_webText ?? '').trim().isEmpty ? '—' : _webText!,
+                      style: const TextStyle(
+                        color: AppColors.whiteWarm,
+                        height: 1.5,
+                        fontSize: 13,
+                      ),
+                    ),
+                  )
+                : WebViewWidget(controller: _controller),
           if (_loading)
             const Center(
               child: CircularProgressIndicator(color: AppColors.gold),
@@ -135,7 +221,11 @@ class _LegalScreenState extends State<LegalScreen> {
                           _loading = true;
                           _hasError = false;
                         });
-                        _controller.loadRequest(Uri.parse(_url));
+                        if (kIsWeb) {
+                          _loadForWeb();
+                        } else {
+                          _controller.loadRequest(Uri.parse(_url));
+                        }
                       },
                     ),
                   ],
