@@ -44,8 +44,12 @@ Future<void> bootstrap() async {
   // ─── Analytics ─────────────────────────────────────────────────
   // Default to enabled in release; the user can later opt out via UI when
   // a consent flow is added (see planning/LEGAL.md §3 — CCPA disclosure).
-  await FirebaseAnalytics.instance
-      .setAnalyticsCollectionEnabled(!kDebugMode);
+  try {
+    await FirebaseAnalytics.instance
+        .setAnalyticsCollectionEnabled(!kDebugMode);
+  } catch (_) {
+    // Web builds can run without analytics bindings; do not block startup.
+  }
 
   // ─── System UI ─────────────────────────────────────────────────
   SystemChrome.setSystemUIOverlayStyle(
