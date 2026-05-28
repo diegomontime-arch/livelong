@@ -298,124 +298,233 @@ String generateApproachSuggestion({
   final dependentes = answers['dependentes'] is int
       ? answers['dependentes'] as int
       : int.tryParse('${answers['dependentes']}') ?? 0;
+  final renda = answers['renda'] is int
+      ? answers['renda'] as int
+      : int.tryParse('${answers['renda']}') ?? 1;
   final seguro = answers['seguro'] is int
       ? answers['seguro'] as int
       : int.tryParse('${answers['seguro']}') ?? 0;
   final preocupacao = answers['preocupacao']?.toString() ?? '';
+  final momento = (answers['momento']?.toString() ?? '').toLowerCase().trim();
 
-  final tips = <String>[];
-  late final String urgencia;
+  String dependentesLabel() => switch (dependentes) {
+        0 => l == 'es'
+            ? 'solo'
+            : l == 'en'
+                ? 'solo'
+                : 'sozinho(a)',
+        1 => l == 'es'
+            ? '1–2 dependientes'
+            : l == 'en'
+                ? '1–2 dependents'
+                : '1–2 dependentes',
+        2 => l == 'es'
+            ? '3–4 dependientes'
+            : l == 'en'
+                ? '3–4 dependents'
+                : '3–4 dependentes',
+        _ => l == 'es'
+            ? 'familia grande (5+)'
+            : l == 'en'
+                ? 'large family (5+)'
+                : 'família grande (5+)',
+      };
 
-  if (score < 30) {
-    urgencia = l == 'en'
-        ? '\u{1F534} HIGH PRIORITY'
-        : l == 'es'
-            ? '\u{1F534} PRIORIDAD ALTA'
-            : '\u{1F534} PRIORIDADE ALTA';
-  } else if (score < 60) {
-    urgencia = l == 'en'
-        ? '\u{1F7E1} MEDIUM PRIORITY'
-        : l == 'es'
-            ? '\u{1F7E1} PRIORIDAD MEDIA'
-            : '\u{1F7E1} PRIORIDADE MÉDIA';
-  } else {
-    urgencia = l == 'en'
-        ? '\u{1F7E2} UPGRADE OPPORTUNITY'
-        : l == 'es'
-            ? '\u{1F7E2} OPORTUNIDAD DE MEJORA'
-            : '\u{1F7E2} OPORTUNIDADE DE UPGRADE';
-  }
+  String rendaLabel() => switch (renda) {
+        1 => l == 'es'
+            ? 'hasta \$2K/mes'
+            : l == 'en'
+                ? 'up to \$2K/mo'
+                : 'até \$2K/mês',
+        2 => l == 'es'
+            ? '\$2–4K/mes'
+            : l == 'en'
+                ? '\$2–4K/mo'
+                : '\$2–4K/mês',
+        3 => l == 'es'
+            ? '\$4–7K/mes'
+            : l == 'en'
+                ? '\$4–7K/mo'
+                : '\$4–7K/mês',
+        _ => l == 'es'
+            ? 'más de \$7K/mes'
+            : l == 'en'
+                ? 'above \$7K/mo'
+                : 'acima \$7K/mês',
+      };
 
-  if (dependentes >= 2) {
-    if (l == 'pt') {
-      tips.add('→ Família grande — cobertura para todos os membros');
-      tips.add(
-        '→ Educação universitária nos EUA custa \$50K-\$200K por filho — aborde isso',
-      );
-    } else if (l == 'es') {
-      tips.add('→ Familia grande — cobertura para todos los miembros');
-      tips.add(
-        '→ Universidad en EE.UU. cuesta \$50K-\$200K por hijo — menciona esto',
-      );
-    } else {
-      tips.add('→ Large family — coverage for all members');
-      tips.add('→ US college costs \$50K-\$200K per child — bring this up');
+  String seguroLabel() => switch (seguro) {
+        0 => l == 'es'
+            ? 'sin seguro'
+            : l == 'en'
+                ? 'no coverage'
+                : 'sem seguro',
+        1 => l == 'es'
+            ? 'seguro básico'
+            : l == 'en'
+                ? 'basic coverage'
+                : 'seguro básico',
+        2 => l == 'es'
+            ? 'por el trabajo'
+            : l == 'en'
+                ? 'through work'
+                : 'pelo trabalho',
+        _ => l == 'es'
+            ? 'seguro completo'
+            : l == 'en'
+                ? 'full coverage'
+                : 'seguro completo',
+      };
+
+  String preocupacaoLabel() => switch (preocupacao) {
+        'moradia' => l == 'es'
+            ? 'vivienda'
+            : l == 'en'
+                ? 'housing'
+                : 'moradia',
+        'educacao' => l == 'es'
+            ? 'educación'
+            : l == 'en'
+                ? 'education'
+                : 'educação',
+        'dividas' => l == 'es'
+            ? 'deudas'
+            : l == 'en'
+                ? 'debts'
+                : 'dívidas',
+        'familia' => l == 'es'
+            ? 'familia'
+            : l == 'en'
+                ? 'family'
+                : 'família',
+        _ => l == 'es'
+            ? 'general'
+            : l == 'en'
+                ? 'general'
+                : 'geral',
+      };
+
+  final hasNoCoverage = seguro == 0;
+  final largeFamily = dependentes >= 2;
+
+  // ── Parte 1: Perfil (uma linha)
+  final profile = () {
+    final parts = <String>[
+      dependentesLabel(),
+      seguroLabel(),
+      l == 'es'
+          ? 'ingreso ${rendaLabel()}'
+          : l == 'en'
+              ? 'income ${rendaLabel()}'
+              : 'renda ${rendaLabel()}',
+      l == 'es'
+          ? 'preocupación: ${preocupacaoLabel()}'
+          : l == 'en'
+              ? 'concern: ${preocupacaoLabel()}'
+              : 'preocupação: ${preocupacaoLabel()}',
+    ];
+
+    if (momento == 'urgente') {
+      parts.add(l == 'es' ? 'momento: urgente' : l == 'en' ? 'timing: urgent' : 'momento: urgente');
+    } else if (momento == 'pesquisando') {
+      parts.add(l == 'es' ? 'momento: investigando' : l == 'en' ? 'timing: researching' : 'momento: pesquisando');
+    } else if (momento == 'curioso') {
+      parts.add(l == 'es' ? 'momento: curioso' : l == 'en' ? 'timing: curious' : 'momento: curioso');
     }
-  }
 
-  if (preocupacao == 'educacao' ||
-      preocupacao == 'educación' ||
-      preocupacao == 'education') {
-    if (l == 'pt') {
-      tips.add(
-        '→ Foco em educação — mostre como seguro financia faculdade dos filhos',
-      );
-    } else if (l == 'es') {
-      tips.add(
-        '→ Enfocado en educación — muestra cómo el seguro financia la universidad',
-      );
-    } else {
-      tips.add('→ Education focused — show how insurance funds college');
+    return parts.join(', ');
+  }();
+
+  // ── Parte 2: Como abrir
+  final opener = () {
+    if (preocupacao == 'educacao') {
+      return l == 'es'
+          ? 'Vi que tienes hijos y piensas en su futuro. ¿Sabías que en EE.UU. una universidad puede costar hasta \$200K? Déjame mostrarte cómo protegerte de eso.'
+          : l == 'en'
+              ? 'I saw you care about your kids’ future. Did you know a US college can cost up to \$200K? Let me show you a simple way to protect that.'
+              : 'Vi que você tem filhos e pensa no futuro deles. Sabia que nos EUA uma faculdade pode custar até \$200K? Deixa eu te mostrar como se proteger disso.';
     }
-  }
-
-  if (preocupacao == 'dividas' ||
-      preocupacao == 'deudas' ||
-      preocupacao == 'debts') {
-    if (l == 'pt') {
-      tips.add(
-        '→ Tem dívidas — Living Benefit protege família se adoecer e não puder trabalhar',
-      );
-    } else if (l == 'es') {
-      tips.add(
-        '→ Tiene deudas — Living Benefit protege familia si se enferma',
-      );
-    } else {
-      tips.add('→ Has debts — Living Benefit protects family if unable to work');
+    if (preocupacao == 'dividas') {
+      return l == 'es'
+          ? 'Vi que tienes deudas. Si algo te pasara mañana, ¿tu familia podría pagar todo? Tengo una solución que protege exactamente eso.'
+          : l == 'en'
+              ? 'I saw you have debts. If something happened tomorrow, could your family handle the bills? I have a solution that protects exactly that.'
+              : 'Vi que você tem dívidas. Se algo acontecer com você amanhã, sua família consegue pagar tudo? Tenho uma solução que protege exatamente isso.';
     }
-  }
-
-  if (preocupacao == 'familia' || preocupacao == 'family') {
-    if (l == 'pt') {
-      tips.add(
-        '→ Preocupado com família — argumento emocional: "e se algo acontecer com você amanhã?"',
-      );
-    } else if (l == 'es') {
-      tips.add(
-        '→ Preocupado por familia — argumento: "¿qué pasa si algo te ocurre mañana?"',
-      );
-    } else {
-      tips.add(
-        '→ Family focused — emotional: "what happens to them if something happens to you?"',
-      );
+    if (preocupacao == 'familia') {
+      return l == 'es'
+          ? 'Pusiste que tu familia es tu mayor prioridad. Te voy a mostrar cómo garantizar que estén bien pase lo que pase.'
+          : l == 'en'
+              ? 'You said your family is your top priority. I’ll show you how to make sure they’re protected no matter what happens.'
+              : 'Você respondeu que sua família é sua maior prioridade. Vou te mostrar como garantir que eles fiquem bem independente do que acontecer.';
     }
-  }
-
-  if (seguro == 0) {
-    if (l == 'pt') {
-      tips.add('→ Sem proteção atual — urgência máxima, família 100% vulnerável');
-    } else if (l == 'es') {
-      tips.add('→ Sin protección actual — urgencia máxima, familia 100% vulnerable');
-    } else {
-      tips.add('→ No current coverage — maximum urgency, family 100% vulnerable');
+    if (preocupacao == 'moradia') {
+      return l == 'es'
+          ? 'Vi que tu prioridad es la vivienda. Si faltara tu ingreso por un tiempo, ¿la casa seguiría segura? Te muestro una protección práctica para eso.'
+          : l == 'en'
+              ? 'I saw housing is your main concern. If your income stopped for a while, would the home stay safe? I can show you practical protection for that.'
+              : 'Vi que sua prioridade é moradia. Se sua renda faltasse por um tempo, a casa continuaria segura? Te mostro uma proteção prática pra isso.';
     }
-  }
+    if (hasNoCoverage) {
+      return l == 'es'
+          ? 'Ahora estás 100% sin protección. La buena noticia: con menos de \$50/mes ya puedes cambiar eso. ¿Te muestro opciones?'
+          : l == 'en'
+              ? 'Right now you’re 100% unprotected. Good news: for under \$50/month you can change that. Want me to show options?'
+              : 'Você está 100% desprotegido agora. Mas a boa notícia é que com menos de \$50/mês você já muda isso. Quer que eu te mostre as opções?';
+    }
+    return l == 'es'
+        ? 'Vi tu diagnóstico y tu score. Te propongo algo simple: en 10 minutos te muestro una opción que encaja con tu perfil.'
+        : l == 'en'
+            ? 'I saw your diagnosis and score. Here’s a simple plan: in 10 minutes I’ll show an option that fits your profile.'
+            : 'Vi seu diagnóstico e seu score. Te proponho algo simples: em 10 minutos eu te mostro uma opção que encaixa no seu perfil.';
+  }();
 
-  if (l == 'pt') {
-    tips.add('→ Sempre mencione o Benefício em Vida — diferencial M4LIFE');
-  } else if (l == 'es') {
-    tips.add('→ Siempre menciona el Beneficio en Vida — diferencial M4LIFE');
-  } else {
-    tips.add('→ Always mention the Living Benefit — M4LIFE differentiator');
-  }
+  // ── Parte 3: O que oferecer
+  final offer = () {
+    if (score < 30 && largeFamily && hasNoCoverage) {
+      return l == 'es'
+          ? 'Empieza con Term Life de \$250K (o más si el presupuesto lo permite) para cubrir familia y deudas. Menciona el Living Benefit desde el inicio.'
+          : l == 'en'
+              ? 'Start with a \$250K Term Life (or higher if budget allows) to cover family + debts. Mention the Living Benefit early.'
+              : 'Comece com Term Life de \$250K (ou mais se couber no orçamento) — cobre família e dívidas. Mencione o Living Benefit logo no início.';
+    }
+    if (score < 60 && (seguro == 1 || seguro == 2)) {
+      return l == 'es'
+          ? 'Ofrece upgrade a un plan con Living Benefit: argumento principal = seguro que puede pagar en vida, no solo al fallecer.'
+          : l == 'en'
+              ? 'Offer an upgrade to a plan with Living Benefit: main angle = insurance that can pay while alive, not only at death.'
+              : 'Ofereça upgrade para plano com Living Benefit — argumento: seguro que paga em vida, não só na morte.';
+    }
+    if (score >= 60) {
+      return l == 'es'
+          ? 'El prospect ya tiene una base. Enfócate en optimizar: más cobertura para hijos, ajustar duración del Term, y revisar gaps (educación/hipoteca).'
+          : l == 'en'
+              ? 'Prospect already has a base. Focus on optimization: more coverage for kids, term length, and closing gaps (college/mortgage).'
+              : 'Prospect já tem base. Foco em otimização e em aumentar cobertura para os filhos (educação/hipoteca) e fechar gaps.';
+    }
+    if (hasNoCoverage) {
+      return l == 'es'
+          ? 'Prioriza poner cobertura básica hoy (Term Life). Después, presenta Living Benefit como diferencial para subir el nivel.'
+          : l == 'en'
+              ? 'Prioritize getting basic coverage in place today (Term Life). Then introduce Living Benefit as the differentiator to level up.'
+              : 'Priorize colocar uma proteção básica hoje (Term Life). Depois, apresente o Living Benefit como diferencial para subir o nível.';
+    }
+    return l == 'es'
+        ? 'Haz una recomendación simple en 2 opciones (básico vs. mejor) y guía por presupuesto. Incluye Living Benefit como diferencial.'
+        : l == 'en'
+            ? 'Give a simple 2-option recommendation (basic vs. better) guided by budget. Include Living Benefit as a differentiator.'
+            : 'Faça recomendação simples em 2 opções (básico vs. melhor) guiando por orçamento. Inclua Living Benefit como diferencial.';
+  }();
 
-  final header = l == 'en'
-      ? '\u{1F4CB} AGENT APPROACH GUIDE'
-      : l == 'es'
-          ? '\u{1F4CB} GUÍA DE ABORDAJE (AGENTE)'
-          : '\u{1F4CB} GUIA DE ABORDAGEM (AGENTE)';
+  String t(String pt, String es, String en) => l == 'es' ? es : l == 'en' ? en : pt;
 
-  return '\n\n$header\n$urgencia\n${tips.join('\n')}';
+  return '\n\n'
+      '👤 ${t('PERFIL', 'PERFIL', 'PROFILE')}\n'
+      '$profile\n\n'
+      '💬 ${t('COMO ABRIR', 'CÓMO ABRIR', 'HOW TO OPEN')}\n'
+      '"$opener"\n\n'
+      '🎯 ${t('O QUE OFERECER', 'QUÉ OFRECER', 'WHAT TO OFFER')}\n'
+      '$offer';
 }
 
 /// WhatsApp message text. Use [prospectToAgent] when the prospect contacts the agent.
