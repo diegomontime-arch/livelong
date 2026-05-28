@@ -1,4 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -221,17 +222,20 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
     try {
       debugPrint('[HitLook:auth] signIn $email');
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      // iOS Safari can hang indefinitely on some auth/network edge cases.
+      // Always fail fast and show a recoverable error.
+      await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password)
+          .timeout(const Duration(seconds: 15));
 
       final uid = FirebaseAuth.instance.currentUser?.uid;
       debugPrint('[HitLook:auth] Firebase Auth OK uid=$uid');
 
       if (!mounted) return;
 
-      if (await UserSecurity.mustChangePassword()) {
+      final mustChangePassword = await UserSecurity.mustChangePassword()
+          .timeout(const Duration(seconds: 8), onTimeout: () => false);
+      if (mustChangePassword) {
         debugPrint('[HitLook:auth] mustChangePassword → /perfil');
         setState(() => _loading = false);
         if (!mounted) return;
@@ -239,13 +243,19 @@ class _AgentLoginScreenState extends State<AgentLoginScreen> {
         return;
       }
 
-      final route = await AdminSession.postLoginRoute();
+      final route = await AdminSession.postLoginRoute()
+          .timeout(const Duration(seconds: 8), onTimeout: () => RoutePaths.dashboard);
       debugPrint('[HitLook:auth] navigating → $route');
 
       setState(() => _loading = false);
       if (!mounted) return;
       context.go(route);
       return;
+    } on TimeoutException catch (e, st) {
+      debugPrint('[HitLook:auth] login TIMEOUT: $e\n$st');
+      setState(() {
+        _erro = 'Demorou demais para entrar. Verifique sua internet e tente novamente.';
+      });
     } on FirebaseAuthException catch (e, st) {
       debugPrint('[HitLook:auth] FirebaseAuthException: ${e.code} ${e.message}\n$st');
       setState(() {
