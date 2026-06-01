@@ -4,13 +4,13 @@
 - App: https://hitlook-app.web.app
 - GitHub: https://github.com/diegomontime-arch/livelong
 - Firebase: https://console.firebase.google.com/project/hitlook-app
-- Pasta local: ~/livelong
+- Pasta local: ~/Documents/livelong
 
 ## Regra de ouro
 Toda modificação → flutter build web --release → firebase deploy --only hosting → git add . && git commit -m "descrição" && git push
 
 ## Script rápido
-cd ~/livelong && ./save.sh "descrição do que mudou"
+cd ~/Documents/livelong && ./save.sh "descrição do que mudou"
 
 ---
 

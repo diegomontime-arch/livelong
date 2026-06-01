@@ -7,7 +7,7 @@ Plataforma SaaS Flutter para qualificação de leads com IA voltada para vendedo
 Tenant piloto: M4LIFE USA (empresa de seguros de vida do Renan).
 App no ar: https://hitlook-app.web.app
 GitHub: https://github.com/diegomontime-arch/livelong
-Pasta local: ~/livelong
+Pasta local: ~/Documents/livelong
 Firebase projeto: hitlook-app
 
 ## Como funciona
