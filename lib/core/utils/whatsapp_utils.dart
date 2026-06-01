@@ -8,6 +8,17 @@ import 'package:hitlook/core/utils/whatsapp_launcher_stub.dart'
 /// Default consultant WhatsApp (Renan) when agent profile has no number.
 const kDefaultConsultantWhatsApp = '17869738628';
 
+// WhatsApp-safe emoji — UTF-8 string literals (not \u{...} escapes).
+const bell = '🔔';
+const person = '👤';
+const phone = '📱';
+const cake = '🎂';
+const star = '⭐';
+const chart = '📊';
+const bullet = '•';
+const chatBubble = '💬';
+const dartboard = '🎯';
+
 /// Formats phone for wa.me — always includes country code.
 String formatWhatsAppNumber(String raw) {
   final digits = raw.replaceAll(RegExp(r'[^\d]'), '');
@@ -250,41 +261,41 @@ String _prospectToAgentMessage({
   final preocupacao = _formatPreocupacao(l, answers['preocupacao']);
 
   if (l == 'es') {
-    return '\u{1F514} ¡Hola! Acabo de hacer el diagnóstico de protección familiar por M4LIFE USA.\n\n'
-        '\u{1F464} Mi nombre: $nome\n'
-        '\u{1F4F1} Mi teléfono: $phoneDisplay\n'
-        '\u{1F382} Fecha de nacimiento: $birthDisplay\n'
-        '\u{2B50} Mi score: $score% de protección\n\n'
-        '\u{1F4CA} Mi perfil:\n'
-        '\u{2022} Dependientes: $dependentes\n'
-        '\u{2022} Ingreso mensual: $renda\n'
-        '\u{2022} Tengo seguro actual: $seguro\n'
-        '\u{2022} Mi mayor preocupación: $preocupacao\n\n'
+    return '$bell ¡Hola! Acabo de hacer el diagnóstico de protección familiar por M4LIFE USA.\n\n'
+        '$person Mi nombre: $nome\n'
+        '$phone Mi teléfono: $phoneDisplay\n'
+        '$cake Fecha de nacimiento: $birthDisplay\n'
+        '$star Mi score: $score% de protección\n\n'
+        '$chart Mi perfil:\n'
+        '$bullet Dependientes: $dependentes\n'
+        '$bullet Ingreso mensual: $renda\n'
+        '$bullet Tengo seguro actual: $seguro\n'
+        '$bullet Mi mayor preocupación: $preocupacao\n\n'
         'Me gustaría saber más sobre las opciones disponibles para mi familia.';
   }
   if (l == 'en') {
-    return '\u{1F514} Hi! I just completed the family protection diagnosis through M4LIFE USA.\n\n'
-        '\u{1F464} My name: $nome\n'
-        '\u{1F4F1} My phone: $phoneDisplay\n'
-        '\u{1F382} Date of birth: $birthDisplay\n'
-        '\u{2B50} My score: $score% protection level\n\n'
-        '\u{1F4CA} My profile:\n'
-        '\u{2022} Dependents: $dependentes\n'
-        '\u{2022} Monthly income: $renda\n'
-        '\u{2022} Current life insurance: $seguro\n'
-        '\u{2022} My biggest concern: $preocupacao\n\n'
+    return '$bell Hi! I just completed the family protection diagnosis through M4LIFE USA.\n\n'
+        '$person My name: $nome\n'
+        '$phone My phone: $phoneDisplay\n'
+        '$cake Date of birth: $birthDisplay\n'
+        '$star My score: $score% protection level\n\n'
+        '$chart My profile:\n'
+        '$bullet Dependents: $dependentes\n'
+        '$bullet Monthly income: $renda\n'
+        '$bullet Current life insurance: $seguro\n'
+        '$bullet My biggest concern: $preocupacao\n\n'
         'I would like to learn more about the options available for my family.';
   }
-  return '\u{1F514} Olá! Acabei de fazer o diagnóstico de proteção familiar pela M4LIFE USA.\n\n'
-      '\u{1F464} Meu nome: $nome\n'
-      '\u{1F4F1} Meu telefone: $phoneDisplay\n'
-      '\u{1F382} Data de nascimento: $birthDisplay\n'
-      '\u{2B50} Meu score: $score% de proteção\n\n'
-      '\u{1F4CA} Meu perfil:\n'
-      '\u{2022} Dependentes: $dependentes\n'
-      '\u{2022} Renda mensal: $renda\n'
-      '\u{2022} Tenho seguro atual: $seguro\n'
-      '\u{2022} Minha maior preocupação: $preocupacao\n\n'
+  return '$bell Olá! Acabei de fazer o diagnóstico de proteção familiar pela M4LIFE USA.\n\n'
+      '$person Meu nome: $nome\n'
+      '$phone Meu telefone: $phoneDisplay\n'
+      '$cake Data de nascimento: $birthDisplay\n'
+      '$star Meu score: $score% de proteção\n\n'
+      '$chart Meu perfil:\n'
+      '$bullet Dependentes: $dependentes\n'
+      '$bullet Renda mensal: $renda\n'
+      '$bullet Tenho seguro atual: $seguro\n'
+      '$bullet Minha maior preocupação: $preocupacao\n\n'
       'Gostaria de saber mais sobre as opções disponíveis para minha família.';
 }
 
@@ -519,11 +530,11 @@ String generateApproachSuggestion({
   String t(String pt, String es, String en) => l == 'es' ? es : l == 'en' ? en : pt;
 
   return '\n\n'
-      '👤 ${t('PERFIL', 'PERFIL', 'PROFILE')}\n'
+      '$person ${t('PERFIL', 'PERFIL', 'PROFILE')}\n'
       '$profile\n\n'
-      '💬 ${t('COMO ABRIR', 'CÓMO ABRIR', 'HOW TO OPEN')}\n'
+      '$chatBubble ${t('COMO ABRIR', 'CÓMO ABRIR', 'HOW TO OPEN')}\n'
       '"$opener"\n\n'
-      '🎯 ${t('O QUE OFERECER', 'QUÉ OFRECER', 'WHAT TO OFFER')}\n'
+      '$dartboard ${t('O QUE OFERECER', 'QUÉ OFRECER', 'WHAT TO OFFER')}\n'
       '$offer';
 }
 
