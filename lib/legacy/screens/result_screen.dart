@@ -36,6 +36,7 @@ class _ResultScreenState extends State<ResultScreen>
   late Animation<double> _fadeIn;
   late Animation<double> _scoreAnim;
   String _consultantPhone = kDefaultConsultantWhatsApp;
+  AgentProfile _agent = AgentProfile.defaultProfile;
 
   double _renda = 3000;
   int _anos = 10;
@@ -249,6 +250,9 @@ class _ResultScreenState extends State<ResultScreen>
     try {
       final agent = await AgentProvider.loadAgent(widget.agentId);
       final raw = agent.whatsapp.trim();
+      if (mounted) {
+        setState(() => _agent = agent);
+      }
       if (raw.isNotEmpty && normalizeWhatsAppNumber(raw).isNotEmpty) {
         if (mounted) {
           setState(() => _consultantPhone = raw);
@@ -307,6 +311,7 @@ class _ResultScreenState extends State<ResultScreen>
           score: _score,
           nome: widget.nome,
           agentId: widget.agentId,
+          agent: _agent,
         ),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
           position: Tween<Offset>(

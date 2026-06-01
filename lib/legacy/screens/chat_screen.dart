@@ -1,9 +1,13 @@
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
+import 'package:hitlook/core/utils/whatsapp_utils.dart';
+import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
+import 'package:hitlook/legacy/screens/agent_profile.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 import 'package:hitlook/legacy/widgets/public_lead_flow_scaffold.dart';
 
@@ -17,6 +21,7 @@ class ChatScreen extends StatefulWidget {
   final int score;
   final String nome;
   final String agentId;
+  final AgentProfile agent;
 
   const ChatScreen({
     super.key,
@@ -24,6 +29,7 @@ class ChatScreen extends StatefulWidget {
     required this.answers,
     required this.score,
     required this.nome,
+    required this.agent,
     this.agentId = 'default',
   });
 
@@ -151,6 +157,143 @@ YOU CANNOT:
       case 'en': return 'Consultant';
       default: return 'Consultor';
     }
+  }
+
+  String _agentCardIntro() {
+    switch (widget.lang) {
+      case 'es':
+        return '¿Listo para hablar con un especialista?';
+      case 'en':
+        return 'Ready to talk to a specialist?';
+      default:
+        return 'Pronto para falar com um especialista?';
+    }
+  }
+
+  String _agentCardRole() {
+    switch (widget.lang) {
+      case 'en':
+        return 'M4LIFE USA Consultant';
+      default:
+        return 'Consultor M4LIFE USA';
+    }
+  }
+
+  String _agentCardTalkLabel() {
+    switch (widget.lang) {
+      case 'es':
+        return 'Hablar';
+      case 'en':
+        return 'Talk';
+      default:
+        return 'Falar';
+    }
+  }
+
+  void _openConsultantWhatsApp() {
+    final phone = widget.agent.whatsapp.trim().isNotEmpty
+        ? widget.agent.whatsapp
+        : kDefaultConsultantWhatsApp;
+
+    if (normalizeWhatsAppNumber(phone).isEmpty) return;
+
+    final msg = buildLeadWhatsAppMessage(
+      lang: widget.lang,
+      score: widget.score,
+      nome: widget.nome,
+      answers: widget.answers,
+      prospectToAgent: true,
+    );
+
+    if (kIsWeb) {
+      openWhatsAppImmediately(phone: phone, message: msg);
+      return;
+    }
+
+    openWhatsApp(phone: phone, message: msg);
+  }
+
+  Widget _buildAgentFooterCard() {
+    final agent = widget.agent;
+    final storageUid = agent.userId?.trim().isNotEmpty == true
+        ? agent.userId!
+        : agent.id;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.blackCard,
+        border: Border(
+          top: BorderSide(color: AppColors.gold.withOpacity(0.2)),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            _agentCardIntro(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.greyLight,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              AgentProfilePhoto(
+                displayName: agent.resolvedNome,
+                storageUid: storageUid,
+                photoUrl: agent.fotoUrl.isNotEmpty ? agent.fotoUrl : null,
+                size: 48,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      agent.resolvedNome,
+                      style: const TextStyle(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      _agentCardRole(),
+                      style: const TextStyle(
+                        color: AppColors.greyLight,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _openConsultantWhatsApp,
+                icon: const Icon(Icons.chat, size: 18),
+                label: Text(_agentCardTalkLabel()),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   /// Regulatory disclaimer shown directly under the Ana header
@@ -355,7 +498,7 @@ YOU CANNOT:
 
                     // Botão consultor
                     GestureDetector(
-                      onTap: () {},
+                      onTap: _openConsultantWhatsApp,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 7),
@@ -436,6 +579,9 @@ YOU CANNOT:
                         .toList(),
                   ),
                 ),
+
+              // ── CARD DO CONSULTOR ───────────
+              _buildAgentFooterCard(),
 
               // ── INPUT ───────────────────────
               Container(
