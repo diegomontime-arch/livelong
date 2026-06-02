@@ -146,12 +146,12 @@ class HitLookDiscreteBadge extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const OwlMark(size: 18, opacity: 0.75),
-        const SizedBox(width: 6),
+        const OwlMark(size: 28, opacity: 0.85),
+        const SizedBox(width: 8),
         Text(
           'HitLook',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 20,
             color: AppColors.grey.withValues(alpha: 0.85),
             fontWeight: FontWeight.w500,
             letterSpacing: 0.5,
@@ -480,6 +480,11 @@ class _LanguageScreenState extends State<LanguageScreen>
   String? _selected;
   bool _splashDone = false;
   late String _agentId;
+  AgentProfile _agent = AgentProfile.defaultProfile;
+  String _publicSlug = '';
+  bool _loadingAgent = false;
+
+  bool get _hasAgentLink => _agentId != 'default';
 
   @override
   void initState() {
@@ -489,6 +494,9 @@ class _LanguageScreenState extends State<LanguageScreen>
       '[Photo] LanguageScreen init agentId=$_agentId '
       '(route=${widget.agentId}, browser slug on web)',
     );
+    if (_hasAgentLink) {
+      _loadAgent();
+    }
     _ctrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -513,11 +521,43 @@ class _LanguageScreenState extends State<LanguageScreen>
         routerState: GoRouterState.of(context),
       );
       if (slug != 'default' && slug != _agentId) {
-        _agentId = slug;
+        setState(() => _agentId = slug);
         debugPrint('[Photo] LanguageScreen slug from GoRouter: $_agentId');
+        _loadAgent();
       }
     } catch (_) {
       // Not under GoRouter yet.
+    }
+  }
+
+  Future<void> _loadAgent() async {
+    if (!_hasAgentLink) return;
+
+    setState(() => _loadingAgent = true);
+
+    try {
+      var loadId = _agentId;
+      var publicSlug = _agentId;
+
+      if (AgentProvider.looksLikeFirebaseUid(loadId)) {
+        final slug = await AgentProvider.resolvePublicLinkId(loadId);
+        if (slug.isNotEmpty && !AgentProvider.looksLikeFirebaseUid(slug)) {
+          loadId = slug;
+          publicSlug = slug;
+        }
+      }
+
+      final agent = await AgentProvider.loadAgent(loadId);
+
+      if (!mounted) return;
+      setState(() {
+        _agent = agent;
+        _publicSlug = publicSlug;
+        _loadingAgent = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingAgent = false);
     }
   }
 
@@ -570,6 +610,36 @@ class _LanguageScreenState extends State<LanguageScreen>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 20),
+                    if (_hasAgentLink) ...[
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: HitLookDiscreteBadge(),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_loadingAgent)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: Center(
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.gold,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        AgentCard(
+                          agent: _agent,
+                          publicSlug:
+                              _publicSlug.isNotEmpty ? _publicSlug : _agentId,
+                          lang: _selected ?? 'pt',
+                          prominent: true,
+                        ),
+                      const SizedBox(height: 24),
+                    ],
                     if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
                       Text(
                         'Descubra seu nível de proteção familiar',
