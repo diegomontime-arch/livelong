@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:hitlook/core/utils/whatsapp_utils.dart';
 import 'package:hitlook/legacy/admin/agent_profile_photo.dart';
 import 'package:hitlook/legacy/screens/language_screen.dart';
 
@@ -517,7 +516,7 @@ String agentPublicDisplayName(AgentProfile agent, {String? publicSlug}) {
   if (publicSlug == null ||
       publicSlug.isEmpty ||
       publicSlug == 'default') {
-    return AgentProfile.defaultProfile.nome;
+    return '';
   }
 
   debugPrint(
@@ -536,37 +535,126 @@ String? _effectivePublicSlug(AgentProfile agent, String? publicSlug) {
   return null;
 }
 
+bool _isBrandBio(String bio) {
+  final b = bio.toLowerCase();
+  return b.contains('m4life') || b.contains('money for life');
+}
+
 // ─── CARD DO AGENTE NA PÁGINA DO CLIENTE ─────────────────
 class AgentCard extends StatelessWidget {
   final AgentProfile agent;
   /// URL slug from `/a/:slug` — used when [agent.id] is a Firebase UID.
   final String? publicSlug;
+  final String lang;
+  final bool prominent;
 
-  const AgentCard({super.key, required this.agent, this.publicSlug});
+  const AgentCard({
+    super.key,
+    required this.agent,
+    this.publicSlug,
+    this.lang = 'pt',
+    this.prominent = false,
+  });
+
+  static String publicTitle(AgentProfile agent, String lang) {
+    final bio = agent.bio.trim();
+    if (bio.isNotEmpty && !_isBrandBio(bio)) return bio;
+    return switch (lang) {
+      'es' => 'Consultor de Protección Familiar',
+      'en' => 'Family Protection Consultant',
+      _ => 'Consultor de Proteção Familiar',
+    };
+  }
+
+  static String _fallbackName(String lang) => switch (lang) {
+        'es' => 'Tu consultor',
+        'en' => 'Your consultant',
+        _ => 'Seu consultor',
+      };
 
   @override
   Widget build(BuildContext context) {
-    // publicSlug vem do pai (ex. WelcomeScreen.agentId) — não usar GoRouterState
-    // aqui: esta tela é aberta com Navigator.push, fora de RouteBase.builder.
     final displayName = agentPublicDisplayName(agent, publicSlug: publicSlug);
+    final name = displayName.isNotEmpty ? displayName : _fallbackName(lang);
+    final title = publicTitle(agent, lang);
+    final storageUid = agent.userId?.trim().isNotEmpty == true
+        ? agent.userId!
+        : agent.id;
+
     debugPrint(
       '[Photo] AgentCard slug=$publicSlug userId=${agent.userId} '
       'fotoUrl=${agent.fotoUrl}',
     );
+
+    if (prominent) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+        decoration: BoxDecoration(
+          color: AppColors.blackCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: AppColors.gold.withValues(alpha: 0.55),
+                  width: 2,
+                ),
+              ),
+              child: AgentProfilePhoto(
+                key: ValueKey('$storageUid|${agent.fotoUrl}|prominent'),
+                displayName: name,
+                storageUid: storageUid,
+                photoUrl: agent.fotoUrl.isNotEmpty ? agent.fotoUrl : null,
+                size: 96,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: AppColors.white,
+                height: 1.15,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.greyLight,
+                height: 1.4,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.blackCard,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.gold.withOpacity(0.2)),
+        border: Border.all(color: AppColors.gold.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
           AgentProfilePhoto(
-            key: ValueKey('${agent.userId}|${agent.fotoUrl}'),
-            displayName: displayName,
-            storageUid: agent.userId,
+            key: ValueKey('$storageUid|${agent.fotoUrl}'),
+            displayName: name,
+            storageUid: storageUid,
             photoUrl: agent.fotoUrl.isNotEmpty ? agent.fotoUrl : null,
             size: 56,
           ),
@@ -576,7 +664,7 @@ class AgentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  displayName,
+                  name,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -585,7 +673,7 @@ class AgentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  agent.bio,
+                  title,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppColors.greyLight,
@@ -597,30 +685,6 @@ class AgentCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          if (agent.whatsapp.isNotEmpty)
-            GestureDetector(
-              onTap: () => openWhatsApp(
-                phone: agent.whatsapp,
-                message: 'Olá!',
-              ),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF25D366).withOpacity(0.12),
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: const Color(0xFF25D366).withOpacity(0.4),
-                  ),
-                ),
-                child: const Icon(
-                  Icons.chat_outlined,
-                  size: 16,
-                  color: Color(0xFF25D366),
-                ),
-              ),
-            ),
         ],
       ),
     );

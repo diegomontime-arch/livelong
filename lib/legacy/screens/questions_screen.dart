@@ -329,6 +329,7 @@ class _QuestionScreenState extends State<QuestionScreen>
       child: PublicLeadFlowScaffold(
         lang: widget.lang,
         child: WatermarkBackground(
+          lang: widget.lang,
           child: SafeArea(
             child: FadeTransition(
               opacity: _fade,

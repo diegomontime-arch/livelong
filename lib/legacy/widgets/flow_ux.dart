@@ -251,6 +251,7 @@ class AgentNotFoundScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.black,
       body: WatermarkBackground(
+        lang: lang,
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 28),

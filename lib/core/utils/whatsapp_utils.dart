@@ -233,15 +233,15 @@ String _agentOutreachMessage({
   final greeting = first.isNotEmpty ? ' $first' : '';
 
   if (lang == 'es') {
-    return '¡Hola$greeting! Vi tu diagnóstico de protección familiar '
-        '($score%). Soy tu consultor M4LIFE — ¿podemos hablar?';
+    return '¡Hola$greeting! Acabo de hacer el diagnóstico de protección '
+        'familiar y me gustaría hablar sobre las opciones disponibles.';
   }
   if (lang == 'en') {
-    return 'Hi$greeting! I saw your family protection diagnosis '
-        '($score%). I\'m your M4LIFE consultant — can we talk?';
+    return 'Hi$greeting! I just completed the family protection assessment '
+        'and would like to discuss the available options.';
   }
-  return 'Olá$greeting! Vi seu diagnóstico de proteção familiar '
-      '($score%). Sou seu consultor M4LIFE — podemos conversar?';
+  return 'Olá$greeting! Acabei de fazer o diagnóstico de proteção familiar '
+      'e gostaria de conversar sobre as opções disponíveis.';
 }
 
 String _prospectToAgentMessage({
@@ -253,50 +253,17 @@ String _prospectToAgentMessage({
   required Map<String, dynamic> answers,
 }) {
   final l = _whatsappLang(lang);
-  final phoneDisplay = formatPhoneForWhatsAppMessage(telefone);
-  final birthDisplay = nascimento.trim().isNotEmpty ? nascimento.trim() : '—';
-  final dependentes = _formatDependentes(l, answers['dependentes']);
-  final renda = _formatRenda(l, answers['renda']);
-  final seguro = _formatSeguro(l, answers['seguro']);
-  final preocupacao = _formatPreocupacao(l, answers['preocupacao']);
 
   if (l == 'es') {
-    return '$bell ¡Hola! Acabo de hacer el diagnóstico de protección familiar por M4LIFE USA.\n\n'
-        '$person Mi nombre: $nome\n'
-        '$phone Mi teléfono: $phoneDisplay\n'
-        '$cake Fecha de nacimiento: $birthDisplay\n'
-        '$star Mi score: $score% de protección\n\n'
-        '$chart Mi perfil:\n'
-        '$bullet Dependientes: $dependentes\n'
-        '$bullet Ingreso mensual: $renda\n'
-        '$bullet Tengo seguro actual: $seguro\n'
-        '$bullet Mi mayor preocupación: $preocupacao\n\n'
-        'Me gustaría saber más sobre las opciones disponibles para mi familia.';
+    return '¡Hola! Acabo de hacer el diagnóstico de protección familiar '
+        'y me gustaría hablar sobre las opciones disponibles.';
   }
   if (l == 'en') {
-    return '$bell Hi! I just completed the family protection diagnosis through M4LIFE USA.\n\n'
-        '$person My name: $nome\n'
-        '$phone My phone: $phoneDisplay\n'
-        '$cake Date of birth: $birthDisplay\n'
-        '$star My score: $score% protection level\n\n'
-        '$chart My profile:\n'
-        '$bullet Dependents: $dependentes\n'
-        '$bullet Monthly income: $renda\n'
-        '$bullet Current life insurance: $seguro\n'
-        '$bullet My biggest concern: $preocupacao\n\n'
-        'I would like to learn more about the options available for my family.';
+    return 'Hi! I just completed the family protection assessment '
+        'and would like to discuss the available options.';
   }
-  return '$bell Olá! Acabei de fazer o diagnóstico de proteção familiar pela M4LIFE USA.\n\n'
-      '$person Meu nome: $nome\n'
-      '$phone Meu telefone: $phoneDisplay\n'
-      '$cake Data de nascimento: $birthDisplay\n'
-      '$star Meu score: $score% de proteção\n\n'
-      '$chart Meu perfil:\n'
-      '$bullet Dependentes: $dependentes\n'
-      '$bullet Renda mensal: $renda\n'
-      '$bullet Tenho seguro atual: $seguro\n'
-      '$bullet Minha maior preocupação: $preocupacao\n\n'
-      'Gostaria de saber mais sobre as opções disponíveis para minha família.';
+  return 'Olá! Acabei de fazer o diagnóstico de proteção familiar '
+      'e gostaria de conversar sobre as opções disponíveis.';
 }
 
 /// Rule-based approach guide for the agent (appended to prospect WhatsApp message).

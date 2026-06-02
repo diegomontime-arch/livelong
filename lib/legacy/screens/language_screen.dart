@@ -137,13 +137,77 @@ class _OwlPainter extends CustomPainter {
   bool shouldRepaint(CustomPainter old) => false;
 }
 
-// ─── WATERMARK ────────────────────────────────────────────
-class WatermarkBackground extends StatelessWidget {
-  final Widget child;
-  const WatermarkBackground({super.key, required this.child});
+// ─── HITLOOK DISCRETO (fluxo público) ─────────────────────
+class HitLookDiscreteBadge extends StatelessWidget {
+  const HitLookDiscreteBadge({super.key});
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const OwlMark(size: 18, opacity: 0.75),
+        const SizedBox(width: 6),
+        Text(
+          'HitLook',
+          style: TextStyle(
+            fontSize: 11,
+            color: AppColors.grey.withValues(alpha: 0.85),
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Rodapé discreto — apenas fluxo público do prospect.
+class PublicFlowFooter extends StatelessWidget {
+  const PublicFlowFooter({super.key, this.lang = 'pt'});
+
+  final String lang;
+
+  String get _text {
+    switch (lang) {
+      case 'es':
+        return 'Powered by HitLook · Herramienta educativa';
+      case 'en':
+        return 'Powered by HitLook · Educational tool';
+      default:
+        return 'Powered by HitLook · Ferramenta educacional';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Text(
+        _text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 10,
+          height: 1.3,
+          color: AppColors.grey.withValues(alpha: 0.45),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── WATERMARK ────────────────────────────────────────────
+class WatermarkBackground extends StatelessWidget {
+  final Widget child;
+  /// Quando definido, ativa badge HitLook e rodapé do fluxo público.
+  final String? lang;
+
+  const WatermarkBackground({super.key, required this.child, this.lang});
+
+  @override
+  Widget build(BuildContext context) {
+    final publicFlow = lang != null;
+
     return Stack(
       children: [
         // Decorative layers must not steal taps (Safari iOS WebKit).
@@ -155,41 +219,44 @@ class WatermarkBackground extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          bottom: 80,
-          left: 0,
-          right: 0,
-          child: IgnorePointer(
-            child: Center(
-              child: Opacity(
-                opacity: 0.022,
-                child: Text(
-                  'M4LIFE',
-                  style: TextStyle(
-                    fontSize: 72,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.gold,
-                    letterSpacing: 16,
-                  ),
-                ),
-              ),
+        if (!publicFlow)
+          const Positioned(
+            bottom: 18,
+            right: 18,
+            child: IgnorePointer(
+              child: OwlMark(size: 44, opacity: 0.09),
             ),
           ),
-        ),
-        const Positioned(
-          bottom: 18,
-          right: 18,
-          child: IgnorePointer(
-            child: OwlMark(size: 44, opacity: 0.09),
+        if (publicFlow)
+          const Positioned(
+            top: 12,
+            right: 12,
+            child: IgnorePointer(child: HitLookDiscreteBadge()),
+          ),
+        if (publicFlow)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: IgnorePointer(
+              child: PublicFlowFooter(lang: lang!),
+            ),
+          ),
+        if (!publicFlow)
+          Positioned(
+            top: 14,
+            right: 14,
+            child: IgnorePointer(child: _AiIndicator()),
+          ),
+        Positioned.fill(
+          child: Padding(
+            padding: EdgeInsets.only(
+              top: publicFlow ? 36 : 0,
+              bottom: publicFlow ? 32 : 0,
+            ),
+            child: child,
           ),
         ),
-        Positioned(
-          top: 14,
-          right: 14,
-          child: IgnorePointer(child: _AiIndicator()),
-        ),
-        // Fill constraints so Column+Expanded (dashboard, admin) layout safely.
-        Positioned.fill(child: child),
       ],
     );
   }
@@ -490,6 +557,7 @@ class _LanguageScreenState extends State<LanguageScreen>
     return PublicLeadFlowScaffold(
       lang: _selected,
       child: WatermarkBackground(
+        lang: _selected ?? 'pt',
         child: SafeArea(
           child: FadeTransition(
             opacity: _fadeIn,
@@ -503,8 +571,27 @@ class _LanguageScreenState extends State<LanguageScreen>
                   children: [
                     const SizedBox(height: 20),
                     if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
-                      const M4LifeLogo(fontSize: 42),
-                      const SizedBox(height: 56),
+                      Text(
+                        'Descubra seu nível de proteção familiar',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.white,
+                          height: 1.25,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Discover your family protection level',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.greyLight.withValues(alpha: 0.85),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 40),
                     ] else
                       const SizedBox(height: 12),
 
@@ -566,30 +653,41 @@ class _LanguageScreenState extends State<LanguageScreen>
 
                     const SizedBox(height: 48),
 
-                    Text(
-                      'AI · PROTECTION · SALES',
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: AppColors.goldDim.withOpacity(0.6),
-                        letterSpacing: 3,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: AppColors.gold.withValues(alpha: 0.28),
+                        ),
+                      ),
+                      child: const Text(
+                        'PROTEÇÃO INTELIGENTE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.gold,
+                          letterSpacing: 2.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
-                    // Regulatory disclaimer — visible to the prospect
-                    // (planning/LEGAL.md §6, planning/APPLE_RELEASE.md §2.4).
                     Padding(
                       padding:
                           const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'Educational tool. Not insurance advice. '
-                        'Recommendations come from your licensed agent.',
+                        'Ferramenta educacional. Não constitui aconselhamento de seguros.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 10,
                           height: 1.35,
-                          color: AppColors.grey.withOpacity(0.75),
+                          color: AppColors.grey.withValues(alpha: 0.75),
                         ),
                       ),
                     ),
@@ -846,7 +944,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       'b2': 'Suas informações são privadas',
       'b3': 'Resultado personalizado para você',
       'btn': 'DESCOBRIR MEU NÍVEL DE PROTEÇÃO',
-      'disc': 'Ferramenta educacional. Não constitui aconselhamento de seguros. Consulte um agente licenciado.',
+      'disc': 'Ferramenta educacional. Não constitui aconselhamento de seguros.',
     },
     'es': {
       'badge': 'PROTECCIÓN INTELIGENTE',
@@ -857,7 +955,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       'b2': 'Tu información es privada',
       'b3': 'Resultado personalizado para ti',
       'btn': 'DESCUBRIR MI NIVEL DE PROTECCIÓN',
-      'disc': 'Herramienta educativa. No constituye asesoramiento de seguros. Consulte un agente licenciado.',
+      'disc': 'Herramienta educativa. No constituye asesoramiento de seguros.',
     },
     'en': {
       'badge': 'SMART PROTECTION',
@@ -868,7 +966,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       'b2': 'Your information is private',
       'b3': 'Personalized result for you',
       'btn': 'DISCOVER MY PROTECTION LEVEL',
-      'disc': 'Educational tool only. Does not constitute insurance advice. Consult a licensed agent.',
+      'disc': 'Educational tool only. Does not constitute insurance advice.',
     },
   };
 
@@ -885,6 +983,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       return Scaffold(
         backgroundColor: AppColors.black,
         body: WatermarkBackground(
+          lang: widget.lang,
           child: SafeArea(
             child: Column(
               children: [
@@ -910,6 +1009,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       child: PublicLeadFlowScaffold(
         lang: widget.lang,
         child: WatermarkBackground(
+          lang: widget.lang,
           child: SafeArea(
             bottom: true,
             child: _loadingAgent
@@ -927,21 +1027,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                           children: [
                             const SizedBox(height: 16),
                             const FlowBackButton(),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 12),
 
-                            if (!PublicLeadFlowScaffold.isDesktopLayout(
-                                context)) ...[
-                      const M4LifeLogo(fontSize: 22, showTagline: true),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Card do agente
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 0),
-                      child: AgentCard(
-                        agent: _agent,
-                        publicSlug: _publicSlug.isNotEmpty ? _publicSlug : _agentId,
-                      ),
+                    // Card do agente — protagonista
+                    AgentCard(
+                      agent: _agent,
+                      publicSlug:
+                          _publicSlug.isNotEmpty ? _publicSlug : _agentId,
+                      lang: widget.lang,
+                      prominent: true,
                     ),
 
                     const SizedBox(height: 24),
@@ -1223,6 +1317,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       child: PublicLeadFlowScaffold(
         lang: widget.lang,
         child: WatermarkBackground(
+          lang: widget.lang,
           child: SafeArea(
             child: FadeTransition(
               opacity: _fadeIn,
@@ -1243,11 +1338,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       const SizedBox(height: 16),
                       const FlowBackButton(),
                       const SizedBox(height: 24),
-
-                      if (!PublicLeadFlowScaffold.isDesktopLayout(context)) ...[
-                        const M4LifeLogo(fontSize: 20, showTagline: true),
-                        const SizedBox(height: 32),
-                      ],
 
                       // Linha dourada divisora
                     Container(

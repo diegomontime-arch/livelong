@@ -234,7 +234,7 @@ class _ResultScreenState extends State<ResultScreen>
       'talk_ana': {'pt': 'Falar com a Ana agora', 'es': 'Hablar con Ana ahora', 'en': 'Talk to Ana now'},
       'talk_agent': {'pt': 'Falar com um consultor', 'es': 'Hablar con un consultor', 'en': 'Talk to a consultant'},
       'redo': {'pt': 'Refazer o teste', 'es': 'Repetir el test', 'en': 'Redo the test'},
-      'edu_disc': {'pt': 'Ferramenta educacional. Não constitui aconselhamento de seguros. Consulte um agente licenciado.', 'es': 'Herramienta educativa. No constituye asesoramiento de seguros. Consulte un agente licenciado.', 'en': 'Educational tool only. Does not constitute insurance advice. Consult a licensed agent.'},
+      'edu_disc': {'pt': 'Ferramenta educacional. Não constitui aconselhamento de seguros.', 'es': 'Herramienta educativa. No constituye asesoramiento de seguros.', 'en': 'Educational tool only. Does not constitute insurance advice.'},
     };
     return (m[key] ?? {})[l] ?? (m[key] ?? {})['pt'] ?? key;
   }
@@ -450,6 +450,7 @@ class _ResultScreenState extends State<ResultScreen>
       child: PublicLeadFlowScaffold(
         lang: widget.lang,
         child: WatermarkBackground(
+          lang: widget.lang,
           child: SafeArea(
             child: FadeTransition(
               opacity: _fadeIn,
@@ -460,11 +461,7 @@ class _ResultScreenState extends State<ResultScreen>
                   children: [
                     const SizedBox(height: 12),
                     const FlowBackButton(),
-                    const SizedBox(height: 16),
-
-                    const M4LifeLogo(fontSize: 18, showTagline: false),
-
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 8),
 
                   // ── SCORE ──────────────────────
                   Row(

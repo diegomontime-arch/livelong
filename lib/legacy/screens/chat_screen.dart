@@ -43,20 +43,42 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<Map<String, String>> _messages = [];
   bool _loading = false;
 
+  String get _agentName {
+    final name = agentPublicDisplayName(
+      widget.agent,
+      publicSlug: widget.agentId,
+    );
+    if (name.isEmpty) {
+      switch (widget.lang) {
+        case 'es':
+          return 'tu consultor';
+        case 'en':
+          return 'your consultant';
+        default:
+          return 'seu consultor';
+      }
+    }
+    return name;
+  }
+
   String get _systemPrompt {
     final l = widget.lang;
     final nome = widget.nome.split(' ').first;
     final lang = l == 'en' ? 'English' : l == 'es' ? 'Spanish' : 'Brazilian Portuguese';
+    final agentName = _agentName;
 
     final closing = lang == 'en'
-        ? 'For what makes sense for your specific situation, always speak with a licensed M4LIFE consultant.'
+        ? 'For personalized guidance, speak directly with $agentName.'
         : lang == 'es'
-            ? 'Para lo que tiene sentido para tu situación específica, siempre habla con un consultor licenciado de M4LIFE.'
-            : 'Para o que faz sentido para sua situação específica, fale sempre com um consultor licenciado da M4LIFE.';
+            ? 'Para orientación personalizada, habla directamente con $agentName.'
+            : 'Para orientação personalizada, fale diretamente com $agentName.';
 
     return '''
-You are Ana, a friendly financial education assistant for M4LIFE USA.
+You are Ana, a friendly financial education assistant working with $agentName.
 You provide GENERAL financial education only — NOT insurance advice.
+
+NEVER mention HitLook, M4LIFE or any platform or company name.
+You are simply Ana, the assistant of $agentName.
 
 ALWAYS respond in $lang.
 Be warm, concise — maximum 2 short paragraphs per response.
@@ -70,7 +92,7 @@ CRITICAL RULES — NEVER VIOLATE:
 - NEVER say anything that could be interpreted as insurance solicitation
 - NEVER promise approval or coverage
 - ALWAYS end every response with: "$closing"
-- If asked about specific products, plans or prices, say you cannot provide that and redirect to the licensed consultant
+- If asked about specific products, plans or prices, say you cannot provide that and redirect to $agentName
 - Never say you are an AI — you are Ana, financial education assistant
 
 YOU CAN DISCUSS (general education only):
@@ -135,11 +157,15 @@ YOU CANNOT:
     }
   }
 
-  String _onlineLabel() {
+  String _anaSubtitle() {
+    final agentName = _agentName;
     switch (widget.lang) {
-      case 'es': return 'Assistente M4LIFE • En línea';
-      case 'en': return 'M4LIFE Assistant • Online';
-      default: return 'Assistente M4LIFE • Online';
+      case 'es':
+        return 'Ana · Asistente de $agentName';
+      case 'en':
+        return 'Ana · Assistant to $agentName';
+      default:
+        return 'Ana · Assistente de $agentName';
     }
   }
 
@@ -170,14 +196,8 @@ YOU CANNOT:
     }
   }
 
-  String _agentCardRole() {
-    switch (widget.lang) {
-      case 'en':
-        return 'M4LIFE USA Consultant';
-      default:
-        return 'Consultor M4LIFE USA';
-    }
-  }
+  String _agentCardRole() =>
+      AgentCard.publicTitle(widget.agent, widget.lang);
 
   String _agentCardTalkLabel() {
     switch (widget.lang) {
@@ -215,6 +235,7 @@ YOU CANNOT:
 
   Widget _buildAgentFooterCard() {
     final agent = widget.agent;
+    final agentName = _agentName;
     final storageUid = agent.userId?.trim().isNotEmpty == true
         ? agent.userId!
         : agent.id;
@@ -241,7 +262,7 @@ YOU CANNOT:
           Row(
             children: [
               AgentProfilePhoto(
-                displayName: agent.resolvedNome,
+                displayName: agentName,
                 storageUid: storageUid,
                 photoUrl: agent.fotoUrl.isNotEmpty ? agent.fotoUrl : null,
                 size: 48,
@@ -252,7 +273,7 @@ YOU CANNOT:
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      agent.resolvedNome,
+                      agentName,
                       style: const TextStyle(
                         color: AppColors.white,
                         fontWeight: FontWeight.w700,
@@ -413,6 +434,7 @@ YOU CANNOT:
     return PublicLeadFlowScaffold(
       lang: widget.lang,
       child: WatermarkBackground(
+        lang: widget.lang,
         child: SafeArea(
           child: Column(
             children: [
@@ -470,11 +492,16 @@ YOU CANNOT:
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('Ana',
-                              style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.white)),
+                          Text(
+                            _anaSubtitle(),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.white,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           Row(
                             children: [
                               Container(
@@ -486,10 +513,17 @@ YOU CANNOT:
                                 ),
                               ),
                               const SizedBox(width: 5),
-                              Text(_onlineLabel(),
-                                  style: const TextStyle(
-                                      fontSize: 10,
-                                      color: AppColors.grey)),
+                              Text(
+                                widget.lang == 'es'
+                                    ? 'En línea'
+                                    : widget.lang == 'en'
+                                        ? 'Online'
+                                        : 'Online',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: AppColors.grey,
+                                ),
+                              ),
                             ],
                           ),
                         ],

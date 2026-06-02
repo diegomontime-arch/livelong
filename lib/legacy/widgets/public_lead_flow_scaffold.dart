@@ -133,7 +133,7 @@ class _DesktopBrandingPanel extends StatelessWidget {
     final l = lang ?? 'en';
     const data = {
       'pt': {
-        'eyebrow': 'Proteção familiar inteligente',
+        'eyebrow': 'PROTEÇÃO INTELIGENTE',
         'title': 'Descubra o nível de proteção da sua família em minutos.',
         'body':
             'Responda perguntas simples e receba uma análise educacional personalizada — com orientação de um consultor licenciado.',
@@ -143,7 +143,7 @@ class _DesktopBrandingPanel extends StatelessWidget {
         'footer': 'Ferramenta educacional · Não constitui aconselhamento de seguros',
       },
       'es': {
-        'eyebrow': 'Protección familiar inteligente',
+        'eyebrow': 'PROTECCIÓN INTELIGENTE',
         'title': 'Descubre el nivel de protección de tu familia en minutos.',
         'body':
             'Responde preguntas simples y recibe un análisis educativo personalizado — con orientación de un consultor licenciado.',
@@ -153,7 +153,7 @@ class _DesktopBrandingPanel extends StatelessWidget {
         'footer': 'Herramienta educativa · No constituye asesoramiento de seguros',
       },
       'en': {
-        'eyebrow': 'Smart family protection',
+        'eyebrow': 'SMART PROTECTION',
         'title': 'Discover your family protection level in minutes.',
         'body':
             'Answer a few simple questions and get a personalized educational analysis — with guidance from a licensed consultant.',
@@ -176,7 +176,7 @@ class _DesktopBrandingPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const M4LifeLogo(fontSize: 36, showTagline: true),
+          const HitLookDiscreteBadge(),
           const SizedBox(height: 40),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
